@@ -1,4 +1,4 @@
-module Dootverse.WebGPU.Compiler
+module Compiler
 
 open System.Diagnostics
 open Microsoft.FSharp.Quotations
@@ -151,7 +151,7 @@ type Module = {
     }
 
 module rec Print =
-    open Wgsl
+    // open Wgsl
 
     let call (callee: string) (args: WgslExpr list) =
         match callee with

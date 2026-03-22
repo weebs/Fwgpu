@@ -1,4 +1,4 @@
-module rec Dootverse.WebGPU.Wgsl
+module rec Wgsl
 
 open System
 open System.Diagnostics

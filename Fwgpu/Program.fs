@@ -1,12 +1,11 @@
-﻿module Raycast.Renderer.HashmapVoxelRender
+﻿module Program
 
 open System
 open System.Runtime.InteropServices
 open System.Text
 open System.Threading.Tasks
-open Dootverse.WebGPU
 // open Dootverse.WebGPU.Shaders
-open Dootverse.WebGPU.Wgsl
+open Wgsl
 // open Raycast.Compute.ComputeShaders.Shaders
 open Silk.NET.Input
 open Microsoft.FSharp.NativeInterop

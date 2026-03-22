@@ -1,4 +1,4 @@
-module Raycast.Renderer.Init
+module Init
 
 open Microsoft.FSharp.NativeInterop
 open Silk.NET.Core.Native
