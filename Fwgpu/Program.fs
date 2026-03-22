@@ -523,24 +523,21 @@ let init (window: IWindow) =
             sw.Reset()
     )
 
-let run () =
-    let mutable options = WindowOptions.Default
-    options.API <- GraphicsAPI.None
-    options.Size <- Vector2D(400, 300)
-    // options.Size <- Vector2D(1920, 1080)
-    // options.Size <- Vector2D(960, 720)
-    // options.Size <- Vector2D(480, 360)
-    options.FramesPerSecond <- 60
-    options.UpdatesPerSecond <- 60
-    options.Position <- Vector2D(400, 400)
-    options.Title <- "WebGPU Demo"
-    options.IsVisible <- true
-    options.ShouldSwapAutomatically <- true
-    options.IsContextControlDisabled <- false
-    // let window = Window.Create options
-    let window = Window.Create options
-    window.add_Load(fun () -> init window)
-    window.Run()
-    // yo' window
-
-run ()
+let mutable options = WindowOptions.Default
+options.API <- GraphicsAPI.None
+options.Size <- Vector2D(400, 300)
+// options.Size <- Vector2D(1920, 1080)
+// options.Size <- Vector2D(960, 720)
+// options.Size <- Vector2D(480, 360)
+options.FramesPerSecond <- 60
+options.UpdatesPerSecond <- 60
+options.Position <- Vector2D(400, 400)
+options.Title <- "WebGPU Demo"
+options.IsVisible <- true
+options.ShouldSwapAutomatically <- true
+options.IsContextControlDisabled <- false
+// let window = Window.Create options
+let window = Window.Create options
+window.add_Load(fun () -> init window)
+window.Run()
+// yo' window
