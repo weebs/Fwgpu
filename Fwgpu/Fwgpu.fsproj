@@ -10,6 +10,8 @@
         <Compile Include="Compiler.fs" />
         <Compile Include="Setup.fs" />
         <Compile Include="Init.fs" />
+        <Compile Include="Silky.fs" />
+        <Compile Include="Shader.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 
