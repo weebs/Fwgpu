@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vs/
+.vscode/
+
+# F# / .NET build output
+Fwgpu/bin/
+Fwgpu/obj/
+
+# Node / Vite build output
+tsgpu/node_modules/
+tsgpu/dist/
+tsgpu/dist-ssr/
+tsgpu/*.local
+tsgpu/npm-debug.log*
+tsgpu/yarn-debug.log*
+tsgpu/yarn-error.log*
+tsgpu/pnpm-debug.log*
+tsgpu/lerna-debug.log*
