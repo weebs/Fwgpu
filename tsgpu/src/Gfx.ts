@@ -107,13 +107,5 @@ function createRenderPassDescriptor(g: GfxInstance): GPURenderPassDescriptor {
   }
 }
 
-export {
-  setupWgpu,
-  createBindings,
-  crateRenderPipeline,
-  createRenderPassDescriptor,
-  READ,
-  READ_WRITE,
-  MAPPED,
-}
-export type { GfxInstance, BindingInfo }
+export { setupWgpu, createBindings, crateRenderPipeline, createRenderPassDescriptor, READ, READ_WRITE, MAPPED }
+export type { GfxInstance, BindingInfo as BindingDetails }
