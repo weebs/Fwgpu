@@ -5,7 +5,7 @@ interface GfxInstance {
   // pipeline: GPURenderPipeline
 }
 
-interface BindingInfo {
+interface BindingDetails {
   label: string
   type: GPUBufferBindingType
   visibility: GPUShaderStageFlags
@@ -43,7 +43,7 @@ async function setupWgpu(canvas: HTMLCanvasElement): Promise<GfxInstance> {
   return { device, context, format }
 }
 
-function createBindings(device: GPUDevice, descriptors: BindingInfo[]) {
+function createBindings(device: GPUDevice, descriptors: BindingDetails[]) {
   const buffers: GPUBuffer[] = []
   for (const desc of descriptors) {
     const buffer = device.createBuffer({
@@ -108,4 +108,4 @@ function createRenderPassDescriptor(g: GfxInstance): GPURenderPassDescriptor {
 }
 
 export { setupWgpu, createBindings, crateRenderPipeline, createRenderPassDescriptor, READ, READ_WRITE, MAPPED }
-export type { GfxInstance, BindingInfo as BindingDetails }
+export type { GfxInstance, BindingDetails }
