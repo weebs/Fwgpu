@@ -1,6 +1,6 @@
 import React from "react"
 import * as Gfx from "./Gfx.ts"
-import shaderSource from "./shader.wgsl?raw"
+import shaderSource from "./color_rect.wgsl?raw"
 
 const l = 32
 
@@ -24,16 +24,6 @@ class Engine {
     this.rpl = Gfx.crateRenderPipeline(g, shaderSource, this.bindings.layout)
   }
 
-  renderFrame() {
-    var commandEncoder = this.g.device.createCommandEncoder()
-    var passEncoder = commandEncoder.beginRenderPass(Gfx.createRenderPassDescriptor(this.g))
-    passEncoder.setPipeline(this.rpl)
-    passEncoder.setBindGroup(0, this.bindings.group)
-    passEncoder.draw(6, 1, 0, 0)
-    passEncoder.end()
-    this.g.device.queue.submit([commandEncoder.finish()])
-  }
-  // todo : read atomic output buffer by creating a buffer and mapping it or w/e
   readOutput(cb: (data: ArrayBuffer) => void | Promise<void>) {
     var readOutputBuffer = this.g.device.createBuffer({
       size: this.bindings.buffers[2].size,
@@ -54,6 +44,16 @@ class Engine {
       }
     })
   }
+
+  renderFrame() {
+    var commandEncoder = this.g.device.createCommandEncoder()
+    var passEncoder = commandEncoder.beginRenderPass(Gfx.createRenderPassDescriptor(this.g))
+    passEncoder.setPipeline(this.rpl)
+    passEncoder.setBindGroup(0, this.bindings.group)
+    passEncoder.draw(6, 1, 0, 0)
+    passEncoder.end()
+    this.g.device.queue.submit([commandEncoder.finish()])
+  }
 }
 
 export function Game() {
@@ -70,13 +70,14 @@ export function Game() {
         console.log("shader source", shaderSource)
         engine.current = new Engine(g, canvasRef.current!, shaderSource)
         engine.current.renderFrame()
+        engine.current.readOutput(console.log)
       })
       .catch((e) => console.log(e))
   })
   return (
     <div>
       <h1>Game</h1>
-      <canvas ref={canvasRef} />
+      <canvas ref={canvasRef} width={640} height={480} />
     </div>
   )
 }

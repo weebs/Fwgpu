@@ -37,18 +37,6 @@ type Shader(config: Config, camera: vec3f, voxelGrid: uint[], hashes: int[], vox
         // (n <<< int arrayOffset) >>> 31
         (n &&& (1u <<< (31 - int arrayOffset))) >>> 31 - int arrayOffset
         
-        // let index = floor(float32 i / 32f)
-        // let offset = i - (int index * 32)
-        // let n = voxelGrid[int index]
-        // (n <<< offset) >>> 31
-        // extractBits(n, arrayOffset, 1u)
-        // let dbg = vec3(0f, 11f, 8f)
-        // let p = toIndex dbg
-        // if pos.x < 1f && pos.y >= 11f && pos.y <= 12f then
-            // 1u
-        // if i = p then
-        //     1u
-        // else
     let containsVoxel2 pos =
         let i = toIndex pos
         voxelMap[i]
