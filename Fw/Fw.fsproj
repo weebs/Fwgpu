@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FSharp.Compiler.Service" Version="43.10.105" />
+        <PackageReference Include="CliWrap" Version="3.10.1" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.0" />
+        <PackageReference Include="NUnit" Version="4.5.1" />
+        <PackageVersion Include="FSharp.Core" Version="10.1.203" />
+<!--        <PackageReference Include="Microsoft.JavaScript.LibNode" Version="20.1800.215" />-->
+<!--        <PackageReference Include="Microsoft.JavaScript.NodeApi" Version="0.9.19" />-->
+        <Compile Include="Walk.fs" />
+        <Compile Include="Ast.fs" />
+        <Compile Include="Transform.fs" />
+        <Compile Include="Tests\FormattingTests.fs" />
+        <Compile Include="Dbg.fs" />
+        <Compile Include="Program.fs" />
+    </ItemGroup>
+
+</Project>

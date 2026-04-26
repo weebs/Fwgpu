@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fwgpu", "Fwgpu\Fwgpu.fsproj", "{A5D81B4F-A691-4AC5-BD5D-33716052E30D}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fw", "Fw\Fw.fsproj", "{04FC5FE6-B3A1-4E2F-A460-B7C3AA343D3B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{A5D81B4F-A691-4AC5-BD5D-33716052E30D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A5D81B4F-A691-4AC5-BD5D-33716052E30D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A5D81B4F-A691-4AC5-BD5D-33716052E30D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04FC5FE6-B3A1-4E2F-A460-B7C3AA343D3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04FC5FE6-B3A1-4E2F-A460-B7C3AA343D3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04FC5FE6-B3A1-4E2F-A460-B7C3AA343D3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04FC5FE6-B3A1-4E2F-A460-B7C3AA343D3B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
