@@ -6,6 +6,7 @@ type Metadata = class end
 
 type CppTy =
     | Int
+    | Void
     | Named of string
     | Auto
     | Gen of template: string * args: CppTy list
@@ -93,6 +94,7 @@ and printBody (body: CppStmt list) =
 and printType (ty: CppTy) =
     match ty with
     | Auto -> "auto"
+    | Void -> "void"
     | Named s -> s
     | Int -> "int"
     | Gen(template, args) ->
@@ -126,7 +128,11 @@ class {c.name} {{
 {inner}
 }};
 "
-    | Function(name, args, rt, body) -> failwith "todo"
+    | Function(name, args, rt, body) ->
+        let srt = printType rt
+        let inner = printBody body
+        let sargs = args |> List.map (fun (name, ty) -> $"{printType ty} {name}") |> String.concat ", "
+        $"{srt} {name}({sargs}) {{ {inner} }}"
     | Struct s ->
         let inner = s.decls |> List.map printDecl |> String.concat "\n"
         $"

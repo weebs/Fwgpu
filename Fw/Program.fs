@@ -66,8 +66,10 @@ let rec stepDecl (depth: int) (decl: FSharpImplementationFileDeclaration) : Ast.
         if entity.IsFSharpModule then
             printfn $"Module {entity.CompiledName}"
             [
-                for decl in declarations do
-                    yield! stepDecl (depth + 1) decl
+                Ast.Namespace (entity.CompiledName, [
+                    for decl in declarations do
+                        yield! stepDecl (depth + 1) decl
+                ])
             ]
         else
             let fields = entity.FSharpFields
@@ -101,9 +103,10 @@ let rec stepDecl (depth: int) (decl: FSharpImplementationFileDeclaration) : Ast.
         printfn $"%A{stmts}"
         // let output = (result |> List.map Ast.printStmt |> String.concat ";") + ";"
         printfn $"{Ast.printBody stmts}"
+        let rt = Transform.tyConvert body.Type
         // translate (depth + 1) body
         [
-            Ast.Function (mfv.CompiledName, [], Ast.Auto, stmts)
+            Ast.Function (mfv.CompiledName, [], rt, stmts)
         ]
     | FSharpImplementationFileDeclaration.InitAction action ->
         printfn $"Init action"
@@ -130,4 +133,16 @@ for decl in file.ImplementationFile.Value.Declarations do
     for item in stepDecl 0 decl do
         items.Add item
 
+module Format =
+    open CliWrap
+    open CliWrap.Buffered
+    let source (src: string) : string =
+        let cmd =
+            Cli.Wrap("clang-format")
+                .WithStandardInputPipe(PipeSource.FromString src)
+        let result = cmd.ExecuteBufferedAsync().Task.Result
+        result.StandardOutput
+let cppFile = Seq.toList items |> List.map Ast.printDecl |> String.concat "\n"
+let formatted = Format.source cppFile
+printfn $"{formatted}"
 printfn "Done"

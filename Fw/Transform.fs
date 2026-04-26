@@ -1,4 +1,4 @@
-module Fw.Transform
+module rec Fw.Transform
 
 open Ast
 open FSharp.Compiler.Symbols
@@ -8,6 +8,7 @@ open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Symbols
 open FSharp.Compiler.Text
 open System.Collections.Generic
+
 // open FSharpSymbolPatterns
 module P = FSharpExprPatterns
 
@@ -20,7 +21,10 @@ let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
         path
     | None ->
         failwith "Empty declaring entity for module variable"
-       
+
+let isUnit (t: FSharpType) =
+    t.ErasedType.BasicQualifiedName = "Microsoft.FSharp.Core.Unit"
+    
 let fieldName (field: FSharpField) =
     // field.FullName
     field.Name
@@ -36,16 +40,19 @@ let rec translate (e: FSharpExpr) : CppExpr =
         Call (Var path, List.map translate args)
     | P.Call (Some o, mfv, xs, ys, args) ->
         Call(GetField(translate o, mfv.CompiledName), args |> List.map translate)
-    | P.Lambda (mfv, body) when mfv.IsCompilerGenerated && mfv.DisplayName.StartsWith "unitVar" ->
-        if body.Type.BasicQualifiedName = "Microsoft.FSharp.Core.unit" then
-            Lambda ([], translateS body)
-        else
-            Lambda ([], translateS body |> addReturn)
+    // | P.Lambda (mfv, body) when ->
+    //     if isUnit body.Type then
+    //         Lambda ([], translateS body)
+    //     else
+    //         Lambda ([], translateS body |> addReturn)
     | P.Lambda (mfv, body) ->
-        if body.Type.BasicQualifiedName = "Microsoft.FSharp.Core.unit" then
-            Lambda ([], translateS body)
+        let stmts =
+            if isUnit body.Type then translateS body
+            else translateS body |> addReturn
+        if mfv.IsCompilerGenerated && mfv.DisplayName.StartsWith "unitVar" then
+            Lambda ([], stmts)
         else
-            Lambda ([mfv.CompiledName], translateS body |> addReturn)
+            Lambda ([mfv.CompiledName], stmts)
     | P.Value mfv ->
         Var mfv.CompiledName
     | P.ThisValue ty ->
@@ -83,3 +90,18 @@ and translateS (e: FSharpExpr) : CppStmt list =
         [ Assign (GetField (translate dest, fieldName field), translate value) ]
     | _ ->
         [ Exp (translate e) ]
+let funTyConvert (t: FSharpType) =
+    let a = t.GenericArguments[0]
+    let b = t.GenericArguments[1]
+    let args =
+        if isUnit a then ""
+        else $"{printType (tyConvert a)}"
+    let rt = printType (tyConvert b)
+    Gen ("std::function", [ Named $"{rt}({args})" ])
+let tyConvert (t: FSharpType) =
+    match t.ErasedType.BasicQualifiedName with
+    | "System.Int32" -> Int
+    | qn ->
+        if t.IsFunctionType then funTyConvert t
+        elif isUnit t then Ast.Void
+        else Auto
