@@ -28,7 +28,6 @@ type CppClass = {
 type CppStruct = CppClass
 
 type CppDecl =
-  // | Constructor of args: (string * CppTy) list * body: CppStmt list
   | Namespace of name: string * decls: CppDecl list
   | Template of args: string * decl: CppDecl
   | Class of CppClass
