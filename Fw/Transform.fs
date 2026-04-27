@@ -40,11 +40,6 @@ let rec translate (e: FSharpExpr) : CppExpr =
       GetField (translate o, mfv.CompiledName),
       args |> List.map translate
     )
-  // | P.Lambda (mfv, body) when ->
-  //     if isUnit body.Type then
-  //         Lambda ([], translateS body)
-  //     else
-  //         Lambda ([], translateS body |> addReturn)
   | P.Lambda (mfv, body) ->
     let stmts =
       if isUnit body.Type then
@@ -68,9 +63,6 @@ let rec translate (e: FSharpExpr) : CppExpr =
       DerefGetField (Var "this", fieldName field)
     | _ -> GetField (translate e, fieldName field)
   | P.NewObject (mfv, tys, args) -> Var "todo"
-  // | P.Let ((mfv, value, dbg), body) when mfv.IsCompilerGenerated && mfv.CompiledName = "copyOfStruct" ->
-  //     Call(Lambda([], Let(mfv.CompiledName) :: translateS body))
-  //     translate body |> _.ReplaceVar("copyOfStruct", translate value)
   | P.Let ((mfv, value, dbg), body) ->
     let var = Let (mfv.CompiledName, translate value)
     let cppBody = var :: translateS body
@@ -83,7 +75,7 @@ and translateS (e: FSharpExpr) : CppStmt list =
   | P.Let ((mfv, exp, dbg), body) ->
     let value = translate exp
     let name = mfv.CompiledName
-    [ Let (name, value); yield! translateS body ]
+    Let (name, value) :: translateS body
   | P.ValueSet (mfv, value) -> [
       Assign (Var mfv.CompiledName, translate value)
     ]
