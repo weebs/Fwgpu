@@ -65,18 +65,14 @@ type CppCompiler() =
 
     member this.Compile (code: string) =
         let parsed, file = 
-            parseAndTypeCheckSingleFile checker "foo.fs" (SourceText.ofString code)
+            parseAndTypeCheckSingleFile checker "test.fs" (SourceText.ofString code)
             |> Async.RunSynchronously
-        let decls = file.ImplementationFile.Value.Declarations
-        let items = ResizeArray()
-        for decl in decls do
-            let cppDecls = this.ProcessDecl decl
-            for cppDecl in cppDecls do
-                items.Add cppDecl
-        let output = 
-            items |> Seq.toList |> List.map Ast.printDecl |> String.concat "\n"
-        let formatted = Format.source output
-        formatted
+        file.ImplementationFile.Value.Declarations
+        |> List.map this.ProcessDecl
+        |> List.collect id
+        |> List.map Ast.printDecl
+        |> String.concat "\n"
+        |> Format.source
     member private this.ProcessDecl decl =
         match decl with
         | FSharpImplementationFileDeclaration.Entity(entity, declarations) ->
