@@ -9,6 +9,8 @@
 # F# / .NET build output
 Fwgpu/bin/
 Fwgpu/obj/
+**/bin/*
+**/obj/*
 
 # Node / Vite build output
 tsgpu/node_modules/

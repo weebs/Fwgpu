@@ -10,14 +10,23 @@ type CppTy =
     | Named of string
     | Auto
     | Gen of template: string * args: CppTy list
-    
+
+type ArgSig = (string * CppTy) list
+
+type FunctionSignature = {
+    args: ArgSig
+    rt: CppTy
+}
+
 type CppClass =
     {
         name: string
         inherits: string list
         decls: CppDecl list
-        fields: (string * CppTy) list
-        constructors: ((string * CppTy) list * CppStmt list) list
+        // fields: (string * CppTy) list
+        // constructors: ((string * CppTy) list * CppStmt list) list
+        // constructors: (string * CppTy) list list
+        // functions: (string * FunctionSignature) list
     }
     
 type CppStruct = CppClass
@@ -27,7 +36,8 @@ type CppDecl =
     | Namespace of name: string * decls: CppDecl list
     | Template of args: string * decl: CppDecl
     | Class of CppClass
-    | Function of name: string * args: (string * CppTy) list * rt: CppTy * body: CppStmt list
+    | Function of name: string * signature: FunctionSignature * body: CppStmt list option
+    | Constructor of tyName: string * args: ArgSig * body: CppStmt list option
     | Struct of CppStruct
     | Comment of string
     | Variable of name: string * ty: CppTy * value: CppExpr option
@@ -113,35 +123,46 @@ let addReturn (stmts: CppStmt list) =
     | [] -> []
     | [ last ] -> [ addReturn' last ]
     | last :: rest -> addReturn' last :: rest |> List.rev
+
+let printDecls (decls: CppDecl list) =
+    decls |> List.map printDecl |> String.concat "\n"
+let printDefBody (c: CppClass) =
+    printDecls c.decls
+
+let printArgs (args: ArgSig) =
+    args |> List.map (fun (name, ty) -> $"{printType ty} {name}") |> String.concat ", "
+let printFsig (name: string) (fsig: FunctionSignature) =
+    $"{printType fsig.rt} {name}({printArgs fsig.args})"
+
         
 let rec printDecl (decl: CppDecl) =
     match decl with
-    // | Constructor(args, body) -> failwith "todo"
-    | Namespace(name, decls) ->
-        let inner = decls |> List.map printDecl |> String.concat "\n"
-        $"namespace {name} {{\n{inner}\n}}"
-    | Template(args, decl) -> failwith "todo"
-    | Class c ->
-        let inner = c.decls |> List.map printDecl |> String.concat "\n"
-        $"
-class {c.name} {{
-{inner}
-}};
-"
-    | Function(name, args, rt, body) ->
-        let srt = printType rt
-        let inner = printBody body
-        let sargs = args |> List.map (fun (name, ty) -> $"{printType ty} {name}") |> String.concat ", "
-        $"{srt} {name}({sargs}) {{ {inner} }}"
-    | Struct s ->
-        let inner = s.decls |> List.map printDecl |> String.concat "\n"
-        $"
-struct {s.name} {{
-{inner}
-}};
-"
     | Comment s -> $"/* {s} */"
     | Variable(name, ty, None) ->
         $"{printType ty} {name};"
     | Variable(name, ty, Some value) ->
         $"{printType ty} {name} = {print value};"
+    | Namespace(name, decls) ->
+        $"namespace {name} {{\n{printDecls decls}\n}}"
+    | Class c ->
+        $"
+class {c.name} {{
+public:
+{printDefBody c}
+}};
+"
+    | Struct s ->
+        $"
+struct {s.name} {{
+{printDefBody s}
+}};
+"
+    | Constructor(tyName, args, None) ->
+        $"{tyName}({printArgs args});"
+    | Constructor(tyName, args, Some body) ->
+        $"{tyName}({printArgs args}) {{ {printBody body} }}"
+    | Function(name, signature, None) ->
+        $"{printFsig name signature};"
+    | Function(name, signature, Some body) ->
+        $"{printFsig name signature} {{ {printBody body} }}"
+    | Template(args, decl) -> failwith "todo"
