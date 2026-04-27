@@ -69,14 +69,13 @@ type CppCompiler() =
             |> Async.RunSynchronously
         file.ImplementationFile.Value.Declarations
         |> List.map this.ProcessDecl
-        |> List.collect id
         |> List.map Ast.printDecl
         |> String.concat "\n"
         |> Format.source
     member private this.ProcessDecl decl =
         match decl with
         | FSharpImplementationFileDeclaration.Entity(entity, declarations) ->
-            [ this.ProcessEntity entity declarations ]
+            this.ProcessEntity entity declarations
         | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue (mfv, curriedArgs, body) ->
             this.ProcessMfv mfv curriedArgs body
         | FSharpImplementationFileDeclaration.InitAction action ->
@@ -88,7 +87,7 @@ type CppCompiler() =
     member private this.Module entity declarations =
         Ast.Namespace (entity.CompiledName, [
             for decl in declarations do
-                yield! this.ProcessDecl decl
+                this.ProcessDecl decl
         ])
     member private this.Class entity declarations =
         let fields = 
@@ -121,7 +120,7 @@ type CppCompiler() =
             yield! ctors
             yield! members
             for decl in declarations do
-                yield! this.ProcessDecl decl
+                this.ProcessDecl decl
         ]
         Ast.Class {
             name = entity.CompiledName
@@ -148,7 +147,7 @@ type CppCompiler() =
         let tag = $"__init_action_{r.StartLine}_{r.StartColumn}"
         // We represent init actions with static objects with a constructor and 
         // then create a default variable afterwards
-        [
+        Ast.Sequence [
             Ast.Struct {
                 name = tag; inherits = []; decls = [
                     Ast.Constructor (tag, [], Some body)
@@ -180,7 +179,7 @@ type CppCompiler() =
             this.Function mfv curriedArgs body
         elif mfv.IsFunction then this.Function mfv curriedArgs body
         else
-            [
+            Ast.Sequence [
                 if mfv.IsConstructor then
                     Ast.Comment $"Mfv Constructor {mfv}"
                 elif mfv.IsTypeFunction then
@@ -201,9 +200,7 @@ type CppCompiler() =
             stmts |> List.rev |> List.tail |> List.rev
         let className = $"{mfv.DeclaringEntity.Value.CompiledName}"
         let name = $"{className}::{className}"
-        [
-            Ast.Constructor (name, args, Some fixStmts)
-        ]
+        Ast.Constructor (name, args, Some fixStmts)
     member private this.Function mfv curriedArgs body =
         let rt = Transform.tyConvert body.Type
         let args = toArgs mfv curriedArgs
@@ -220,7 +217,7 @@ type CppCompiler() =
                 $"{className}::{mfv.CompiledName}"
             else
                 mfv.CompiledName
-        [
+        Ast.Sequence [
             if mfv.IsMember 
             then Ast.Comment "Member Function"
             else Ast.Comment "Function"
@@ -229,7 +226,7 @@ type CppCompiler() =
     member private this.Value mfv args body =
         let ty = Transform.tyConvert mfv.FullType
         let value = Transform.translate body
-        [
+        Ast.Sequence [
             Ast.Comment $"Mfv Value {mfv}"
             Ast.Variable (mfv.CompiledName, ty, Some value)
         ]
