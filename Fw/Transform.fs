@@ -2,14 +2,7 @@ module rec Fw.Transform
 
 open Ast
 open FSharp.Compiler.Symbols
-open Fw.Ast
-open System
-open FSharp.Compiler.CodeAnalysis
-open FSharp.Compiler.Symbols
-open FSharp.Compiler.Text
-open System.Collections.Generic
 
-// open FSharpSymbolPatterns
 module P = FSharpExprPatterns
 
 let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
@@ -24,9 +17,7 @@ let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
 let isUnit (t: FSharpType) =
   t.ErasedType.BasicQualifiedName = "Microsoft.FSharp.Core.Unit"
 
-let fieldName (field: FSharpField) =
-  // field.FullName
-  field.Name
+let fieldName (field: FSharpField) = field.Name
 
 let rec translate (e: FSharpExpr) : CppExpr =
   match e with

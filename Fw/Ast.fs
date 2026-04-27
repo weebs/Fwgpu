@@ -19,10 +19,6 @@ type CppClass = {
   name: string
   inherits: string list
   decls: CppDecl list
-// fields: (string * CppTy) list
-// constructors: ((string * CppTy) list * CppStmt list) list
-// constructors: (string * CppTy) list list
-// functions: (string * FunctionSignature) list
 }
 
 type CppStruct = CppClass
