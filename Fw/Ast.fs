@@ -41,6 +41,8 @@ type CppDecl =
     | Struct of CppStruct
     | Comment of string
     | Variable of name: string * ty: CppTy * value: CppExpr option
+    /// Synthetic: Helper so functions can return multiple declarations
+    | Sequence of CppDecl list
     
 type CppExpr =
     | Var of string
@@ -134,10 +136,23 @@ let printArgs (args: ArgSig) =
 let printFsig (name: string) (fsig: FunctionSignature) =
     $"{printType fsig.rt} {name}({printArgs fsig.args})"
 
-        
+let printClass (c: CppClass) = $"
+class {c.name} {{
+public:
+    {printDefBody c}
+}};
+"
+let printStruct s = $"
+struct {s.name} {{
+public:
+    {printDefBody s}
+}};
+"
+
 let rec printDecl (decl: CppDecl) =
     match decl with
-    | Comment s -> $"/* {s} */"
+    | Comment s -> 
+        $"/* {s} */"
     | Variable(name, ty, None) ->
         $"{printType ty} {name};"
     | Variable(name, ty, Some value) ->
@@ -145,18 +160,9 @@ let rec printDecl (decl: CppDecl) =
     | Namespace(name, decls) ->
         $"namespace {name} {{\n{printDecls decls}\n}}"
     | Class c ->
-        $"
-class {c.name} {{
-public:
-{printDefBody c}
-}};
-"
+        printClass c
     | Struct s ->
-        $"
-struct {s.name} {{
-{printDefBody s}
-}};
-"
+        printStruct s
     | Constructor(tyName, args, None) ->
         $"{tyName}({printArgs args});"
     | Constructor(tyName, args, Some body) ->
@@ -165,4 +171,7 @@ struct {s.name} {{
         $"{printFsig name signature};"
     | Function(name, signature, Some body) ->
         $"{printFsig name signature} {{ {printBody body} }}"
-    | Template(args, decl) -> failwith "todo"
+    | Sequence decls -> 
+        printDecls decls
+    | Template(args, decl) ->
+        $"template<{args}> {printDecl decl}"

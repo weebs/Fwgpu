@@ -51,7 +51,7 @@ type CppCompiler() =
     let log = Logger()
     let checker = FSharpChecker.Create(keepAssemblyContents=true)
 
-    let uncurryArgs (mfv: FsMfv) (curriedArgs: FsMfv list list) =
+    let toArgs (mfv: FsMfv) (curriedArgs: FsMfv list list) =
         // todo : Properly uncurry
         curriedArgs 
         |> List.collect id
@@ -76,7 +76,7 @@ type CppCompiler() =
     member private this.ProcessDecl decl =
         match decl with
         | FSharpImplementationFileDeclaration.Entity(entity, declarations) ->
-            this.ProcessEntity entity declarations
+            [ this.ProcessEntity entity declarations ]
         | FSharpImplementationFileDeclaration.MemberOrFunctionOrValue (mfv, curriedArgs, body) ->
             this.ProcessMfv mfv curriedArgs body
         | FSharpImplementationFileDeclaration.InitAction action ->
@@ -86,12 +86,10 @@ type CppCompiler() =
         then this.Module entity declarations
         else this.Class entity declarations
     member private this.Module entity declarations =
-        [
-            Ast.Namespace (entity.CompiledName, [
-                for decl in declarations do
-                    yield! this.ProcessDecl decl
-            ])
-        ]
+        Ast.Namespace (entity.CompiledName, [
+            for decl in declarations do
+                yield! this.ProcessDecl decl
+        ])
     member private this.Class entity declarations =
         let fields = 
             entity.FSharpFields
@@ -125,13 +123,11 @@ type CppCompiler() =
             for decl in declarations do
                 yield! this.ProcessDecl decl
         ]
-        [
-            Ast.Class {
-                name = entity.CompiledName
-                inherits = []
-                decls = decls
-            }
-        ]
+        Ast.Class {
+            name = entity.CompiledName
+            inherits = []
+            decls = decls
+        }
 
     member private this.MethodSig mfv =
         let v = mfv.DeclaringEntity.Value
@@ -195,29 +191,28 @@ type CppCompiler() =
                 Ast.Function (funcName, { args = []; rt = rt }, Some stmts)
             ]
     member private this.Constructor mfv curriedArgs body =
-        let txt = $"%A{body}"
         let fix =
             match body with
             | P.Sequential(P.NewObject _, rest) -> rest
             | _ -> body
-        let args = uncurryArgs mfv curriedArgs
+        let args = toArgs mfv curriedArgs
         let stmts = Transform.translateS fix
-        let fixStmts = stmts |> List.rev |> List.tail |> List.rev
+        let fixStmts = 
+            stmts |> List.rev |> List.tail |> List.rev
         let className = $"{mfv.DeclaringEntity.Value.CompiledName}"
         let name = $"{className}::{className}"
         [
-            // Ast.Constructor (name, args, Some stmts)
             Ast.Constructor (name, args, Some fixStmts)
         ]
     member private this.Function mfv curriedArgs body =
         let rt = Transform.tyConvert body.Type
-        let args = uncurryArgs mfv curriedArgs
+        let args = toArgs mfv curriedArgs
         let stmts = 
-            if Transform.isUnit body.Type then
-                Transform.translateS body
-            else
-                Transform.translateS body
-                |> Ast.addReturn
+            Transform.translateS body
+            |> fun stmts ->
+                if Transform.isUnit body.Type 
+                then stmts
+                else Ast.addReturn stmts
         let name = 
             if mfv.IsMember then
                 // Transform.qualifiedPath mfv
