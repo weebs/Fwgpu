@@ -171,13 +171,15 @@ type CppCompiler() =
             else
                 mfv.CompiledName
 
-        if mfv.IsValue then this.Value mfv curriedArgs body
+        if mfv.IsValue then 
+            this.Value mfv body
         elif mfv.IsConstructor then
             this.Constructor mfv curriedArgs body
         elif mfv.IsMember && mfv.IsFunction then 
             // todo : Member function?
             this.Function mfv curriedArgs body
-        elif mfv.IsFunction then this.Function mfv curriedArgs body
+        elif mfv.IsFunction then 
+            this.Function mfv curriedArgs body
         else
             Ast.Sequence [
                 if mfv.IsConstructor then
@@ -223,7 +225,7 @@ type CppCompiler() =
             else Ast.Comment "Function"
             Ast.Function (name, { args = args; rt = rt }, Some stmts)
         ]
-    member private this.Value mfv args body =
+    member private this.Value mfv body =
         let ty = Transform.tyConvert mfv.FullType
         let value = Transform.translate body
         Ast.Sequence [
