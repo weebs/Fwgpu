@@ -4,6 +4,7 @@ open System.IO
 open Fw.Compiler
 
 open Xunit
+open FSharp.Data.LiteralProviders
 
 [<Fact>]
 let ``hello world`` () =
@@ -68,9 +69,9 @@ type AdderWithN(n: int) =
   let code = cc.Compile sourceCode
   printfn $"{sourceCode}\n{code}\n=========="
   let fullCode = Deps.core + "\n" + code |> Format.source
-
+  let outPath = Path.GetDirectoryName(TextFile.cpp.``main.cpp``.Path) + "/basic_instance_method.cpp"
   File.WriteAllText (
-    "/Users/sbeew/repos/Fwgpu/Fw/cpp/simpleclass.cpp",
+    outPath,
     fullCode
   )
 
