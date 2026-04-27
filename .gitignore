@@ -1,6 +1,8 @@
 # macOS
 .DS_Store
 
+*.DotSettings.user
+
 # Editors
 .idea/
 .vs/
@@ -11,6 +13,7 @@ Fwgpu/bin/
 Fwgpu/obj/
 **/bin/*
 **/obj/*
+Fw/cpp
 
 # Node / Vite build output
 tsgpu/node_modules/
