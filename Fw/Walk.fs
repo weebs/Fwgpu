@@ -5,55 +5,55 @@ open FSharp.Compiler.Symbols
 type Ty = FSharpType
 type Mfv = FSharpMemberOrFunctionOrValue
 
-type S =
-  | AddressOf of lvalue: S
-  | AddressSet of lvalue: S * rvalue: S
-  | Application of f: S * tys: Ty list * args: S list
+type E =
+  | AddressOf of lvalue: E
+  | AddressSet of lvalue: E * rvalue: E
+  | Application of f: E * tys: Ty list * args: E list
   | Call of
-    o: S option *
+    o: E option *
     mfv: Mfv *
     tyArgs1: Ty list *
     tyArgs2: Ty list *
-    args: S list
-  | Coerce of target: Ty * e: S
+    args: E list
+  | Coerce of target: Ty * e: E
   | FastIntegerForLoop of
-    start: S *
-    limit: S *
-    consume: S *
+    start: E *
+    limit: E *
+    consume: E *
     isUp: bool
-  | ILAsm of asm: string * typeArgs: Ty list * args: S list
-  | ILFieldGet of o: S option * Ty * fieldName: string
-  | ILFieldSet of o: S option * Ty * fieldName: string * value: S
-  | IfThenElse of guard: S * wt: S * wf: S
-  | Lambda of var: Mfv * body: S
-  | Let of binding: Mfv * value: S * body: S
-  | LetRec of recursiveBindings: (Mfv * S) list * body: S
-  | NewArray of ty: Ty * values: S list
-  | NewDelegate of ty: Ty * body: S
-  | NewObject of ty: Ty * tyArgs: Ty list * args: S list
-  | NewRecord of ty: Ty * args: S list
-  | NewTuple of ty: Ty * args: S list
-  | Quote of q: S
-  | FieldGet of o: S option * ty: Ty * field: FSharpField
-  | AnonRecordGet of o: S * ty: Ty * fieldIndex: int
-  | FieldSet of o: S option * ty: Ty * field: FSharpField
-  | Sequential of S * S
-  | TryFinally of body: S * finalize: S
-  | TryWith of body: S * catchVar: Mfv * catch: S
-  | TupleGet of ty: Ty * index: int * from: S
-  | DecisionTree of decision: S * targets: (Mfv list * S) list
+  | ILAsm of asm: string * typeArgs: Ty list * args: E list
+  | ILFieldGet of o: E option * Ty * fieldName: string
+  | ILFieldSet of o: E option * Ty * fieldName: string * value: E
+  | IfThenElse of guard: E * wt: E * wf: E
+  | Lambda of var: Mfv * body: E
+  | Let of binding: Mfv * value: E * body: E
+  | LetRec of recursiveBindings: (Mfv * E) list * body: E
+  | NewArray of ty: Ty * values: E list
+  | NewDelegate of ty: Ty * body: E
+  | NewObject of ty: Ty * tyArgs: Ty list * args: E list
+  | NewRecord of ty: Ty * args: E list
+  | NewTuple of ty: Ty * args: E list
+  | Quote of q: E
+  | FieldGet of o: E option * ty: Ty * field: FSharpField
+  | AnonRecordGet of o: E * ty: Ty * fieldIndex: int
+  | FieldSet of o: E option * ty: Ty * field: FSharpField
+  | Sequential of E * E
+  | TryFinally of body: E * finalize: E
+  | TryWith of body: E * catchVar: Mfv * catch: E
+  | TupleGet of ty: Ty * index: int * from: E
+  | DecisionTree of decision: E * targets: (Mfv list * E) list
   | DecisionTreeSuccess of
     decisionTargetIdx: int *
-    decisionTargetExprs: S list
-  | TypeLambda of genParam: FSharpGenericParameter * body: S
-  | TypeTest of Ty * S
-  | UnionCaseSet of S * Ty * FSharpUnionCase * FSharpField
-  | UnionCaseGet of S * Ty * FSharpUnionCase * FSharpField
-  | UnionCaseTest of S * Ty * FSharpUnionCase
-  | UnionCaseTag of S * Ty
+    decisionTargetExprs: E list
+  | TypeLambda of genParam: FSharpGenericParameter * body: E
+  | TypeTest of Ty * E
+  | UnionCaseSet of E * Ty * FSharpUnionCase * FSharpField
+  | UnionCaseGet of E * Ty * FSharpUnionCase * FSharpField
+  | UnionCaseTest of E * Ty * FSharpUnionCase
+  | UnionCaseTag of E * Ty
   | ObjectExpr of
     objType: Ty *
-    baseCall: S *
+    baseCall: E *
     overrides: FSharpObjectExprOverride list *
     implementations: (Ty * FSharpObjectExprOverride list) list
   | TraitCall of
@@ -62,9 +62,9 @@ type S =
     typeArgs: FSharp.Compiler.Syntax.SynMemberFlags *
     typeInstantiation: Ty list *
     argTypes: Ty list *
-    argExprs: S list
-  | ValueSet of toSet: Mfv * value: S
-  | WhileLoop of guard: S * body: S
+    argExprs: E list
+  | ValueSet of toSet: Mfv * value: E
+  | WhileLoop of guard: E * body: E
   | BaseValue of Ty
   | DefaultValue of Ty
   | ThisValue of Ty
