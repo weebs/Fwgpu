@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+static std::ios_base::Init stream_initializer; 
 namespace System {
 namespace Console {
 void WriteLine(std::string s) { std::cout << s << std::endl; }
