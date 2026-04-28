@@ -1,1 +1,1 @@
-A work in progress implementation of an F# to C++ transpiler
+A work in progress implementation of an F# to C++ compiler
