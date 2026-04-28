@@ -24,8 +24,10 @@ let compileAndRunCode (testName: string) (src: string) =
   File.WriteAllText(outPath, fullCode)
 
   CliWrap.Cli
-    .Wrap("clang++")
-    .WithArguments([ outPath; "-o"; o ])
+    // .Wrap("clang++")
+    // .WithArguments([ outPath; "-o"; o ])
+    .Wrap("zig")
+    .WithArguments([ "c++"; "-g"; outPath; "-o"; o ])
     .ExecuteAsync()
     .Task.Result
   |> ignore
