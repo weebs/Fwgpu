@@ -45,7 +45,10 @@ type CppExpr =
   | Var of string
   | Const of obj * FSharpType
   | Call of callee: CppExpr * args: CppExpr list
-
+  | CallGen of
+    callee: CppExpr *
+    genArgs: CppExpr list *
+    args: CppExpr list
   | Lambda of args: string list * body: CppStmt list
   | GetField of src: CppExpr * field: string
   | DerefGetField of src: CppExpr * field: string
@@ -87,6 +90,10 @@ let rec print (e: CppExpr) =
   | Call (callee, args) ->
     let txtArgs = args |> List.map print |> String.concat ", "
     $"{print callee}({txtArgs})"
+  | CallGen (callee, genArgs, args) ->
+    let txtArgs = args |> List.map print |> String.concat ", "
+    let txtGenArgs = genArgs |> List.map print |> String.concat ", "
+    $"{print callee}<{txtGenArgs}>({txtArgs})"
   | Lambda (args, body) ->
     let txtArgs =
       args
