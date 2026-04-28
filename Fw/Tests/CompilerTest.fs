@@ -62,7 +62,7 @@ let b = 2
 
     let cc = CppCompiler()
     let code = cc.Compile sourceCode
-    printfn $"{sourceCode}\n{code}\n=========="
+    xunit.WriteLine $"{sourceCode}\n{code}\n=========="
 
   [<Fact>]
   let ``basic arithmetic inside a module let value`` () =
@@ -75,7 +75,7 @@ let c = a + b
 
     let cc = CppCompiler()
     let code = cc.Compile sourceCode
-    printfn $"{sourceCode}\n{code}\n=========="
+    xunit.WriteLine $"{sourceCode}\n{code}\n=========="
 
 
   [<Fact>]
@@ -88,7 +88,7 @@ let add3 x y z = x + y + z
 
     let cc = CppCompiler()
     let code = cc.Compile sourceCode
-    printfn $"{sourceCode}\n{code}\n=========="
+    xunit.WriteLine $"{sourceCode}\n{code}\n=========="
 
   [<Fact>]
   let ``basic instance method`` () =
@@ -106,7 +106,7 @@ type AdderWithN(n: int) =
 
     let cc = CppCompiler()
     let code = cc.Compile sourceCode
-    printfn $"{sourceCode}\n{code}\n=========="
+    xunit.WriteLine $"{sourceCode}\n{code}\n=========="
     let fullCode = Deps.core + "\n" + code |> Format.source
 
     File.WriteAllText(
@@ -143,7 +143,7 @@ System.Console.WriteLine(string n)
 
     let cc = CppCompiler()
     let code = cc.Compile sourceCode
-    printfn $"{sourceCode}\n{code}\n=========="
+    xunit.WriteLine $"{sourceCode}\n{code}\n=========="
 
   [<Fact>]
   let ``id works`` () =
