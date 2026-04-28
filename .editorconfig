@@ -3,5 +3,5 @@
 fsharp_multiline_bracket_style = stroustrup
 indent_size=2
 max_line_length=70
-fsharp_space_before_uppercase_invocation = true
+# fsharp_space_before_uppercase_invocation = true
 fsharp_space_before_member = true
