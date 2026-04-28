@@ -44,12 +44,12 @@ let compileAndRunCode (testName: string) (src: string) =
     output = sb.ToString()
   |}
 
-type TestClass(output: ITestOutputHelper) =
+type TestClass(xunit: ITestOutputHelper) =
   [<Fact>]
   let ``hello world`` () =
     let src = "System.Console.WriteLine(\"Hello, world!\")"
     let result = compileAndRunCode "hello_world" src
-    output.WriteLine result.code
+    xunit.WriteLine result.code
     Assert.Equal("Hello, world!\n", result.output)
 
   [<Fact>]
@@ -127,7 +127,7 @@ System.Console.WriteLine result
   "
 
     let result = compileAndRunCode "basic_class" sourceCode
-    output.WriteLine result.code
+    xunit.WriteLine result.code
     Assert.Equal("42\n", result.output)
 
   [<Fact>]
@@ -148,4 +148,4 @@ System.Console.WriteLine(string n)
   [<Fact>]
   let ``id works`` () =
     let result = compileAndRunCode "id_works" "let id x = x"
-    output.WriteLine result.code
+    xunit.WriteLine result.code
