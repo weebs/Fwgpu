@@ -91,7 +91,6 @@ type CppCompiler() =
     // If the first argument is an empty unit arg just remove it
     |> function
       | [ ("", Ast.Void) ] -> []
-      // | ("", Ast.Void) :: rest -> rest
       | args -> args
 
   member this.Compile code = this.Compile("test.fs", code)
