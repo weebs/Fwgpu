@@ -57,10 +57,10 @@ type CppExpr =
     System.Runtime.CompilerServices.ConditionalWeakTable<
       CppExpr,
       Metadata
-     > ()
+     >()
 
   member this.Metadata =
-    sourceMappings.TryGetValue (this)
+    sourceMappings.TryGetValue(this)
     |> function
       | true, metadata -> Some metadata
       | false, _ -> None
@@ -75,10 +75,10 @@ and CppStmt =
     System.Runtime.CompilerServices.ConditionalWeakTable<
       CppStmt,
       Metadata
-     > ()
+     >()
 
   member this.Metadata =
-    sourceMappings.TryGetValue (this)
+    sourceMappings.TryGetValue(this)
     |> function
       | true, metadata -> Some metadata
       | false, _ -> None
@@ -86,15 +86,15 @@ and CppStmt =
 let rec print (e: CppExpr) =
   match e with
   | Var s -> s
-  | Const (o, ``type``) -> $"%A{o}"
-  | Call (callee, args) ->
+  | Const(o, ``type``) -> $"%A{o}"
+  | Call(callee, args) ->
     let txtArgs = args |> List.map print |> String.concat ", "
     $"{print callee}({txtArgs})"
-  | CallGen (callee, genArgs, args) ->
+  | CallGen(callee, genArgs, args) ->
     let txtArgs = args |> List.map print |> String.concat ", "
     let txtGenArgs = genArgs |> List.map print |> String.concat ", "
     $"{print callee}<{txtGenArgs}>({txtArgs})"
-  | Lambda (args, body) ->
+  | Lambda(args, body) ->
     let txtArgs =
       args
       |> List.map (fun arg -> $"auto {arg}")
@@ -102,15 +102,15 @@ let rec print (e: CppExpr) =
 
     let txtBody = printBody body
     $"[]({txtArgs}){{{txtBody}}}"
-  | GetField (src, field) -> $"{print src}.{field}"
-  | DerefGetField (src, field) -> $"{print src}->{field}"
+  | GetField(src, field) -> $"{print src}.{field}"
+  | DerefGetField(src, field) -> $"{print src}->{field}"
 
 and printStmt (s: CppStmt) =
   match s with
-  | Let (name, value) -> $"auto {name} = {print value}"
+  | Let(name, value) -> $"auto {name} = {print value}"
   | Exp cppExpr -> print cppExpr
   | Return cppExpr -> $"return {print cppExpr}"
-  | Assign (dest, value) -> $"{print dest} = {print value}"
+  | Assign(dest, value) -> $"{print dest} = {print value}"
 
 and printBody (body: CppStmt list) =
   (body |> List.map printStmt |> String.concat ";") + ";"
@@ -121,16 +121,16 @@ and printType (ty: CppTy) =
   | Void -> "void"
   | Named s -> s
   | Int -> "int"
-  | Gen (template, args) ->
+  | Gen(template, args) ->
     let txtArgs = args |> List.map printType |> String.concat ", "
     $"{template}<{txtArgs}>"
 
 let private addReturn' (s: CppStmt) =
   match s with
   | Exp cppExpr -> Return cppExpr
-  | Let (name, value) -> s
+  | Let(name, value) -> s
   | Return cppExpr -> s
-  | Assign (dest, value) -> s
+  | Assign(dest, value) -> s
 
 let addReturn (stmts: CppStmt list) =
   match List.rev stmts with
@@ -170,18 +170,18 @@ public:
 let rec printDecl (decl: CppDecl) =
   match decl with
   | Comment s -> $"/* {s} */"
-  | Variable (name, ty, None) -> $"{printType ty} {name};"
-  | Variable (name, ty, Some value) ->
+  | Variable(name, ty, None) -> $"{printType ty} {name};"
+  | Variable(name, ty, Some value) ->
     $"{printType ty} {name} = {print value};"
-  | Namespace (name, decls) ->
+  | Namespace(name, decls) ->
     $"namespace {name} {{\n{printDecls decls}\n}}"
   | Class c -> printClass c
   | Struct s -> printStruct s
-  | Constructor (tyName, args, None) -> $"{tyName}({printArgs args});"
-  | Constructor (tyName, args, Some body) ->
+  | Constructor(tyName, args, None) -> $"{tyName}({printArgs args});"
+  | Constructor(tyName, args, Some body) ->
     $"{tyName}({printArgs args}) {{ {printBody body} }}"
-  | Function (name, signature, None) -> $"{printFsig name signature};"
-  | Function (name, signature, Some body) ->
+  | Function(name, signature, None) -> $"{printFsig name signature};"
+  | Function(name, signature, Some body) ->
     $"{printFsig name signature} {{ {printBody body} }}"
   | Sequence decls -> printDecls decls
-  | Template (args, decl) -> $"template<{args}> {printDecl decl}"
+  | Template(args, decl) -> $"template<{args}> {printDecl decl}"
