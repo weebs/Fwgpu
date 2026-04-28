@@ -3,6 +3,7 @@
 namespace System {
 namespace Console {
 void WriteLine(std::string s) { std::cout << s << std::endl; }
+void WriteLine(int n) { std::cout << n << std::endl; }
 } // namespace Console
 } // namespace System
 namespace Microsoft {
