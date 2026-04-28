@@ -122,9 +122,10 @@ let funTyConvert (t: FSharpType) =
 let tyConvert (t: FSharpType) =
   if t.IsGenericParameter then
     Named t.GenericParameter.Name
+  elif Transform.isUnit t then
+    Void
   else
     match t.ErasedType.BasicQualifiedName with
-    | "Microsoft.FSharp.Core.Unit" -> Void
     | "System.Int32" -> Int
     | qn ->
       if t.IsFunctionType then
