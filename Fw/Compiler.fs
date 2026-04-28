@@ -15,7 +15,15 @@ type FsImplFileDecl = FSharpImplementationFileDeclaration
 
 module Deps =
   open FSharp.Data.LiteralProviders
-  let core = TextFile.``standard_library.cpp``.Text
+
+  let core =
+    let path = TextFile.``standard_library.cpp``.Path
+
+    if File.Exists path then
+      File.ReadAllText path
+    else
+      TextFile.``standard_library.cpp``.Text
+
   let corePath = TextFile.``standard_library.cpp``.Path
 
 module Format =
