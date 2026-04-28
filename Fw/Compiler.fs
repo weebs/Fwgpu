@@ -26,7 +26,7 @@ module Format =
     let cmd =
       Cli
         .Wrap("clang-format")
-        .WithStandardInputPipe (PipeSource.FromString src)
+        .WithStandardInputPipe(PipeSource.FromString src)
 
     let result = cmd.ExecuteBufferedAsync().Task.Result
     result.StandardOutput
@@ -35,24 +35,24 @@ let parseAndTypeCheckSingleFile (checker: FSharpChecker) file input =
   async {
     // Get context representing a stand-alone (script) file
     let! projOptions, errors =
-      checker.GetProjectOptionsFromScript (
+      checker.GetProjectOptionsFromScript(
         file,
         input,
         assumeDotNetFramework = false
       )
 
     let! parseFileResults, checkFileResults =
-      checker.ParseAndCheckFileInProject (file, 0, input, projOptions)
+      checker.ParseAndCheckFileInProject(file, 0, input, projOptions)
 
     // Wait until type checking succeeds (or 100 attempts)
     match checkFileResults with
-    | FSharpCheckFileAnswer.Succeeded (res) ->
+    | FSharpCheckFileAnswer.Succeeded(res) ->
       return parseFileResults, res
     | res -> return failwithf "Parsing did not finish... (%A)" res
   }
 
 type Logger() =
-  let log = ResizeArray ()
+  let log = ResizeArray()
   member this.Info (info: string) = fun data -> log.Add data
   member this.Info (data: obj list) = log.Add data
 
@@ -62,9 +62,9 @@ type Logger() =
 type FsMfv = FSharpMemberOrFunctionOrValue
 
 type CppCompiler() =
-  let log = Logger ()
+  let log = Logger()
 
-  let checker = FSharpChecker.Create (keepAssemblyContents = true)
+  let checker = FSharpChecker.Create(keepAssemblyContents = true)
 
   let argFromField (field: FSharpField) =
     field.Name, Transform.tyConvert field.FieldType
@@ -87,11 +87,13 @@ type CppCompiler() =
       // | ("", Ast.Void) :: rest -> rest
       | args -> args
 
-  member this.Compile (code: string) =
+  member this.Compile code = this.Compile("test.fs", code)
+
+  member this.Compile (filename: string, code: string) =
     let parsed, file =
       parseAndTypeCheckSingleFile
         checker
-        "test.fs"
+        filename
         (SourceText.ofString code)
       |> Async.RunSynchronously
 
@@ -99,13 +101,13 @@ type CppCompiler() =
     |> List.map this.ProcessDecl
     |> List.map Ast.printDecl
     |> String.concat "\n"
-    |> Format.source
+  // |> Format.source
 
   member private this.ProcessDecl decl =
     match decl with
-    | FsImplFileDecl.Entity (entity, declarations) ->
+    | FsImplFileDecl.Entity(entity, declarations) ->
       this.ProcessEntity entity declarations
-    | FsImplFileDecl.MemberOrFunctionOrValue (mfv, curriedArgs, body) ->
+    | FsImplFileDecl.MemberOrFunctionOrValue(mfv, curriedArgs, body) ->
       this.ProcessMfv mfv curriedArgs body
     | FsImplFileDecl.InitAction action ->
       this.ProcessInitAction action
@@ -117,7 +119,7 @@ type CppCompiler() =
       this.Class entity declarations
 
   member private this.Module entity declarations =
-    Ast.Namespace (
+    Ast.Namespace(
       entity.CompiledName,
       [
         for decl in declarations do
@@ -129,7 +131,7 @@ type CppCompiler() =
     let fields =
       entity.FSharpFields
       |> Seq.map argFromField
-      |> Seq.map (fun (name, ty) -> Ast.Variable (name, ty, None))
+      |> Seq.map (fun (name, ty) -> Ast.Variable(name, ty, None))
       |> Seq.toList
 
     let ctors =
@@ -137,7 +139,7 @@ type CppCompiler() =
       |> Seq.filter _.IsConstructor
       |> Seq.map argsFromFunction
       |> Seq.map (fun args ->
-        Ast.Constructor (entity.CompiledName, args, None))
+        Ast.Constructor(entity.CompiledName, args, None))
       |> Seq.toList
 
     let members =
@@ -171,7 +173,7 @@ type CppCompiler() =
       |> List.map (fun p -> (p.FullName, Transform.tyConvert p.Type))
 
     let rt = Transform.tyConvert mfv.ReturnParameter.Type
-    Ast.Function ($"{fname}", { rt = rt; args = args }, None)
+    Ast.Function($"{fname}", { rt = rt; args = args }, None)
 
   member private this.ProcessInitAction action =
     let body = Transform.translateS action
@@ -183,9 +185,9 @@ type CppCompiler() =
       Ast.Struct {
         name = tag
         inherits = []
-        decls = [ Ast.Constructor (tag, [], Some body) ]
+        decls = [ Ast.Constructor(tag, [], Some body) ]
       }
-      Ast.Variable (tag, Ast.Named tag, None)
+      Ast.Variable(tag, Ast.Named tag, None)
     ]
 
   member private this.ProcessMfv mfv curriedArgs body =
@@ -230,13 +232,13 @@ type CppCompiler() =
           Ast.Comment
             $"?? MemberOrFunctionOrValue {mfv}: %A{curriedArgs} -> {mfv.ReturnParameter.Type}"
         // Ast.Function (mfv.CompiledName, [], rt, stmts)
-        Ast.Function (funcName, { args = []; rt = rt }, Some stmts)
+        Ast.Function(funcName, { args = []; rt = rt }, Some stmts)
       ]
 
   member private this.Constructor mfv curriedArgs body =
     let fix =
       match body with
-      | P.Sequential (P.NewObject _, rest) -> rest
+      | P.Sequential(P.NewObject _, rest) -> rest
       | _ -> body
 
     let args = argsFromFunction mfv
@@ -244,7 +246,7 @@ type CppCompiler() =
     let fixStmts = stmts |> List.rev |> List.tail |> List.rev
     let className = $"{mfv.DeclaringEntity.Value.CompiledName}"
     let name = $"{className}::{className}"
-    Ast.Constructor (name, args, Some fixStmts)
+    Ast.Constructor(name, args, Some fixStmts)
 
   member private this.Function mfv curriedArgs body =
     let rt = Transform.tyConvert body.Type
@@ -266,9 +268,9 @@ type CppCompiler() =
       else
         mfv.CompiledName
 
-    Ast.Function (name, { args = args; rt = rt }, Some stmts)
+    Ast.Function(name, { args = args; rt = rt }, Some stmts)
 
   member private this.Value mfv body =
     let ty = Transform.tyConvert mfv.FullType
     let value = Transform.translate body
-    Ast.Variable (mfv.CompiledName, ty, Some value)
+    Ast.Variable(mfv.CompiledName, ty, Some value)
