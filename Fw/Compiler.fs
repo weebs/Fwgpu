@@ -192,13 +192,10 @@ type CppCompiler() =
 
   member private this.ProcessMfv mfv curriedArgs body =
     let stmts =
-      if
-        body.Type.ErasedType.BasicQualifiedName = "Microsoft.FSharp.Core.Unit"
-      then
+      if Transform.isUnit body.Type then
         Transform.translateS body
       elif
-        not body.Type.IsFunctionType
-        && body.Type.BasicQualifiedName = "Microsoft.FSharp.Core.unit"
+        not body.Type.IsFunctionType && Transform.isUnit body.Type
       then
         Transform.translateS body
       else
@@ -268,7 +265,17 @@ type CppCompiler() =
       else
         mfv.CompiledName
 
-    Ast.Function(name, { args = args; rt = rt }, Some stmts)
+    let fn = Ast.Function(name, { args = args; rt = rt }, Some stmts)
+
+    if mfv.GenericParameters.Count > 0 then
+      let templateArgs =
+        mfv.GenericParameters
+        |> Seq.map (fun p -> $"typename {p.Name}")
+        |> String.concat ", "
+
+      Ast.Template(templateArgs, fn)
+    else
+      fn
 
   member private this.Value mfv body =
     let ty = Transform.tyConvert mfv.FullType

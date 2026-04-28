@@ -14,7 +14,16 @@ let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
   | None -> failwith "Empty declaring entity for module variable"
 
 let isUnit (t: FSharpType) =
-  t.ErasedType.BasicQualifiedName = "Microsoft.FSharp.Core.Unit"
+  if t.IsGenericParameter then
+    false
+  elif
+    t.ErasedType.BasicQualifiedName = "Microsoft.FSharp.Core.Unit"
+  then
+    true
+  elif t.BasicQualifiedName = "Microsoft.FSharp.Core.unit" then
+    true
+  else
+    false
 
 let fieldName (field: FSharpField) = field.Name
 
@@ -111,15 +120,18 @@ let funTyConvert (t: FSharpType) =
   Gen("std::function", [ Named $"{rt}({args})" ])
 
 let tyConvert (t: FSharpType) =
-  match t.ErasedType.BasicQualifiedName with
-  | "Microsoft.FSharp.Core.Unit" -> Void
-  | "System.Int32" -> Int
-  | qn ->
-    if t.IsFunctionType then
-      funTyConvert t
-    elif t.TypeDefinition.IsValueType = false then
-      Gen("std::shared_ptr", [ Named(refTypeName t) ])
-    elif isUnit t then
-      Ast.Void
-    else
-      Auto
+  if t.IsGenericParameter then
+    Named t.GenericParameter.Name
+  else
+    match t.ErasedType.BasicQualifiedName with
+    | "Microsoft.FSharp.Core.Unit" -> Void
+    | "System.Int32" -> Int
+    | qn ->
+      if t.IsFunctionType then
+        funTyConvert t
+      elif t.TypeDefinition.IsValueType = false then
+        Gen("std::shared_ptr", [ Named(refTypeName t) ])
+      elif isUnit t then
+        Ast.Void
+      else
+        Auto

@@ -144,3 +144,8 @@ System.Console.WriteLine(string n)
     let cc = CppCompiler()
     let code = cc.Compile sourceCode
     printfn $"{sourceCode}\n{code}\n=========="
+
+  [<Fact>]
+  let ``id works`` () =
+    let result = compileAndRunCode "id_works" "let id x = x"
+    output.WriteLine result.code
