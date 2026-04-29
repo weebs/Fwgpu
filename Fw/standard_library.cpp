@@ -4,18 +4,23 @@
 static std::ios_base::Init stream_initializer;
 template <typename T> using Gc = std::shared_ptr<T>;
 namespace System {
+class IComparable_1 {};
+class IComparable {};
+class ValueType {};
+class IEquatable_1 {};
 class Object {
-//   std::string type;
+  //   std::string type;
 
 public:
   virtual ~Object() = default;
-//   bool IsType(std::string typeName) { return type == typeName; }
+  //   bool IsType(std::string typeName) { return type == typeName; }
   std::string ToString() { return "System.Object"; }
-protected:
-  void* __data; // TODO : deleting in the destructor
+
+public:
+  void *__data; // TODO : deleting in the destructor
 };
 template <typename T> bool IsType(Gc<System::Object> obj) {
-    return std::dynamic_pointer_cast<T>(obj) != nullptr;
+  return std::dynamic_pointer_cast<T>(obj) != nullptr;
 }
 class IDisposable {
 public:
@@ -24,6 +29,8 @@ public:
   virtual void System_IDisposable_Dispose() {};
 };
 namespace Collections {
+class IStructuralEquatable {};
+class IStructuralComparable {};
 class IComparer {};
 class IEqualityComparer {};
 } // namespace Collections
@@ -36,11 +43,13 @@ namespace Microsoft {
 namespace FSharp {
 namespace Core {
 namespace LanguagePrimitives {
+Gc<System::Collections::IComparer> GenericComparer;
+Gc<System::Collections::IEqualityComparer> GenericEqualityComparer;
+template <typename T> bool GenericEqualityER(T a, T b) { return a == b; }
 template <typename T>
-bool GenericEqualityER(T a, T b) { return a == b; }
-template <typename T>
-bool GenericEqualityWithComparer(Gc<System::Collections::IEqualityComparer>, T a, T b) {
-    return false;
+bool GenericEqualityWithComparer(Gc<System::Collections::IEqualityComparer>,
+                                 T a, T b) {
+  return false;
 }
 template <typename T>
 int GenericComparisonWithComparer(
@@ -55,6 +64,7 @@ int GenericHashWithComparer(
 namespace IntrinsicFunctions {
 template <typename T> T UnboxGeneric(std::shared_ptr<System::Object> obj) {
   return std::dynamic_pointer_cast<typename T::element_type>(obj);
+//   return std::dynamic_pointer_cast<T>(obj);
 }
 } // namespace IntrinsicFunctions
 } // namespace LanguagePrimitives
@@ -72,9 +82,3 @@ template <typename T> std::string ToString(T x) { return x->ToString(); }
 } // namespace Core
 } // namespace FSharp
 } // namespace Microsoft
-
-
-int foo(int x) {
-    int x = 10;
-    return 0;
-}

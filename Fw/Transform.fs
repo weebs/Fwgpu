@@ -34,10 +34,11 @@ let fieldName (field: FSharpField) = field.Name
 let toCppPath (s: string) = s.Replace("+", "::").Replace(".", "::")
 
 let typeName (t: FSharpType) =
-  if t.BasicQualifiedName = "Microsoft.FSharp.Core.obj" then
-    "System::Object"
-  else
-    t.TypeDefinition.BasicQualifiedName |> toCppPath
+  (if t.BasicQualifiedName = "Microsoft.FSharp.Core.obj" then
+     "System::Object"
+   else
+     t.TypeDefinition.BasicQualifiedName |> toCppPath)
+  |> _.Replace("`", "_")
 
 let entTypeName (ent: FSharpEntity) =
   ent.BasicQualifiedName |> toCppPath
@@ -65,7 +66,10 @@ let rec translate (e: FSharpExpr) : CppExpr =
   | P.DecisionTreeSuccess(idx, exprs) ->
     Call(Var $"_{idx}", List.map translate exprs)
   | P.Coerce(ty, value) when ty.TypeDefinition.IsValueType = true ->
-    ExprComment "Todo: Unwrap obj to value type"
+    let cppTy = tyConvert ty
+
+    Var
+      $"*({printType cppTy}*){translate value |> print}->__data /* TODO Proper obj type test and read */"
   | P.Coerce(ty, value) when ty.TypeDefinition.IsValueType = false ->
     let (Gen("Gc", [ tyTarget ])) = tyConvert ty
 
@@ -141,6 +145,15 @@ let rec translate (e: FSharpExpr) : CppExpr =
     let cppBody = var :: translateS body
     let withReturn = addReturn cppBody
     Call(Lambda([], withReturn, []), [])
+  | P.ILAsm(asm, types, values) ->
+    let getGenComparerAsm =
+      "[I_call\n   (Normalcall,\n    Microsoft.FSharp.Core.LanguagePrimitives::get_GenericComparer(...)(...),\n    None)]"
+
+    if asm = getGenComparerAsm then
+      Var
+        "Microsoft::FSharp::Core::LanguagePrimitives::GenericComparer"
+    else
+      ExprComment asm
   | _ -> ExprComment $"%A{e}"
 // let tree = Walk.prettyPrintDU e
 // ExprComment $"%A{e}"
@@ -150,6 +163,17 @@ let rec translate (e: FSharpExpr) : CppExpr =
 
 and translateS (e: FSharpExpr) : CppStmt list =
   match e with
+  | P.Let((mfv, (P.AddressOf(P.Value valueMfv) as value), dbg), body) when
+    mfv.CompiledName = valueMfv.CompiledName
+    ->
+    let cppTy = tyConvert mfv.FullType
+
+    [
+      SVariable("__temp", cppTy, None)
+      Assign(Var "__temp", translate value)
+      SVariable(mfv.CompiledName, cppTy, Some(Var "__temp"))
+      yield! translateS body
+    ]
   | P.Let((mfv, exp, dbg), body) ->
     let value = translate exp
     let name = mfv.CompiledName
@@ -243,7 +267,8 @@ let tyConvert (t: FSharpType) =
       | "int32" -> Int
       | "bool" -> Bool
       | "byref`1" ->
-        Named $"&{tyConvert t.GenericArguments[0] |> printType}"
+        // Named $"&{tyConvert t.GenericArguments[0] |> printType}"
+        Named $"{tyConvert t.GenericArguments[0] |> printType}*"
       | "obj" -> Gen("Gc", [ Named "System::Object" ])
       | _ -> Auto
     | _ ->
