@@ -11,13 +11,21 @@ let compileAndRunCode (testName: string) (src: string) =
   let code = cc.Compile src
 
   let fullCode =
-    Deps.core + "\n" + code + "int main() { return 0; }"
+    // Deps.core + "\n" + code + "int main() { return 0; }"
+    "#include \"../standard_library.cpp\"\n"
+    + code
+    + "int main() { return 0; }"
     |> Format.source
 
   let dir =
     Path.GetDirectoryName(
       FSharp.Data.LiteralProviders.TextFile.``standard_library.cpp``.Path
     )
+
+  // File.WriteAllText(
+  //   Path.Join(dir, "/standard_library.cpp"),
+  //   Deps.core
+  // )
 
   let o = Path.Join(dir, $"/cpp/{testName}")
   let outPath = o + ".cpp"
@@ -146,6 +154,41 @@ System.Console.WriteLine(string n)
     let cc = CppCompiler()
     let code = cc.Compile sourceCode
     xunit.WriteLine $"{sourceCode}\n{code}\n=========="
+
+  [<Fact>]
+  let ``idisposable smoke test`` () =
+    let src =
+      "
+type Foo() =
+  interface System.IDisposable with
+    member this.Dispose() =
+      System.Console.WriteLine(\"Disposing...\")
+//type [<Struct>] FooStruct() =
+  //interface System.IDisposable with
+    //member this.Dispose() = ()
+let main () =
+  use f = new Foo()
+  //use fs = new FooStruct()
+  System.Console.WriteLine(string f)
+  //System.Console.WriteLine(string fs)
+  0
+main ()
+  "
+
+    let result = compileAndRunCode "idisposable" src
+    xunit.WriteLine result.code
+
+  [<Fact>]
+  let ``basic struct`` () =
+    let src =
+      "
+type [<Struct>] Foo(n: int) =
+  member this.Add x = x + n
+let f = Foo(40)
+System.Console.WriteLine(f.Add(2))"
+
+    let result = compileAndRunCode "basic_struct" src
+    xunit.WriteLine result.code
 
   [<Fact>]
   let ``id works`` () =

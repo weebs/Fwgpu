@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -22,6 +22,7 @@
         <Compile Include="Walk.fs" />
         <Compile Include="Ast.fs" />
         <Compile Include="Transform.fs" />
+        <!-- <Compile Include="Transform2.fs" /> -->
         <Compile Include="Tests\FormattingTests.fs" />
         <Compile Include="Dbg.fs" />
         <Compile Include="Compiler.fs" />

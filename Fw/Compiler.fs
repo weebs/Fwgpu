@@ -71,6 +71,9 @@ type FsMfv = FSharpMemberOrFunctionOrValue
 type CppCompiler() =
   let log = Logger()
 
+  let types = Dictionary()
+
+
   let checker = FSharpChecker.Create(keepAssemblyContents = true)
 
   let argFromField (field: FSharpField) =
@@ -81,6 +84,28 @@ type CppCompiler() =
 
   let argFromMfv (mfv: FsMfv) =
     mfv.CompiledName, Transform.tyConvert mfv.FullType
+
+  // TODO : Properly figure out the this argument
+  let isThisArgument (mfv: FSharpMemberOrFunctionOrValue) =
+    mfv.CompiledName = "this"
+
+  let toArgs
+    (args: FSharpMemberOrFunctionOrValue list list)
+    : Ast.ArgSig =
+    args
+    |> List.collect id
+    |> List.filter (not << isThisArgument)
+    |> List.filter (not << Transform.isUnit << _.FullType)
+    |> List.map (fun mfv ->
+      mfv.FullName, Transform.tyConvert mfv.FullType)
+
+  let toMethodArgs (args: FSharpParameter IList IList) =
+    args
+    |> Seq.map Seq.toList
+    |> Seq.collect id
+    |> Seq.toList
+    |> List.filter (not << Transform.isUnit << _.Type)
+    |> List.map (fun p -> (p.FullName, Transform.tyConvert p.Type))
 
   let argsFromFunction (mfv: FsMfv) =
     // todo : Properly uncurry
@@ -102,6 +127,26 @@ type CppCompiler() =
         filename
         (SourceText.ofString code)
       |> Async.RunSynchronously
+
+    let rec loop (decl: FSharpImplementationFileDeclaration) =
+      match decl with
+      | FsImplFileDecl.Entity(ent, decls) ->
+        if not (types.ContainsKey(ent.FullName)) then
+          types[ent.FullName] <- ResizeArray()
+
+        for d in decls do
+          loop d
+      | FsImplFileDecl.MemberOrFunctionOrValue(mfv, args, body) ->
+        match mfv.DeclaringEntity with
+        | Some ent ->
+          if not (types.ContainsKey(ent.FullName)) then
+            types[ent.FullName] <- ResizeArray()
+
+          types[ent.FullName].Add(mfv, args, body)
+        | None -> printfn "???"
+      | _ -> ()
+
+    List.iter loop file.ImplementationFile.Value.Declarations
 
     file.ImplementationFile.Value.Declarations
     |> List.map this.ProcessDecl
@@ -154,29 +199,59 @@ type CppCompiler() =
       |> Seq.toList
       |> List.map this.MethodSig
 
+    let otherMembers = types[entity.FullName]
+
+    let generated =
+      otherMembers
+      |> Seq.map (fun (mfv, _, _) -> mfv)
+      |> Seq.filter _.IsCompilerGenerated
+      |> Seq.toList
+      |> List.map this.MethodSig
+
+    let inherits =
+      match entity.BaseType with
+      | Some bt -> [ Transform.typeName bt ]
+      | _ -> []
+
     let decls = [
       yield! fields
       yield! ctors
       yield! members
+      yield! generated
       for decl in declarations do
         this.ProcessDecl decl
     ]
 
+    // todo : AllInterfaces vs DeclaredInterfaces?
+    // let all = entity.AllInterfaces
+    let interfaces =
+      entity.DeclaredInterfaces
+      |> Seq.toList
+      |> List.map Transform.typeName
+
     Ast.Class {
       name = entity.CompiledName
-      inherits = []
+      inherits = inherits @ interfaces
       decls = decls
     }
 
   member private this.MethodSig mfv =
-    let fname = mfv.CompiledName
+    let fname =
+      if not mfv.IsExplicitInterfaceImplementation then
+        mfv.CompiledName
+      else
+        mfv.CompiledName.Replace(".", "_")
 
+    // todo : use toArgs ?
     let args =
       mfv.CurriedParameterGroups
       |> Seq.map Seq.toList
       |> Seq.collect id
       |> Seq.toList
+      |> List.filter (not << Transform.isUnit << _.Type)
       |> List.map (fun p -> (p.FullName, Transform.tyConvert p.Type))
+    // let args = toArgs mfv.CurriedParameterGroups
+    let args = toMethodArgs mfv.CurriedParameterGroups
 
     let rt = Transform.tyConvert mfv.ReturnParameter.Type
     Ast.Function($"{fname}", { rt = rt; args = args }, None)
@@ -253,7 +328,12 @@ type CppCompiler() =
 
   member private this.Function mfv curriedArgs body =
     let rt = Transform.tyConvert body.Type
-    let args = argsFromFunction mfv
+    // let args = argsFromFunction mfv
+    let args = toArgs curriedArgs
+
+    let converted = Walk.convert body
+    printfn $"%A{converted}"
+    // printfn $"%A{Walk.prettyPrintDU converted}"
 
     let stmts =
       Transform.translateS body
@@ -267,7 +347,9 @@ type CppCompiler() =
       if mfv.IsMember then
         // Transform.qualifiedPath mfv
         let className = mfv.DeclaringEntity.Value.CompiledName
-        $"{className}::{mfv.CompiledName}"
+        // Replace interface methods "." with "_"
+        let funcName = mfv.CompiledName.Replace(".", "_")
+        $"{className}::{funcName}"
       else
         mfv.CompiledName
 
@@ -277,7 +359,7 @@ type CppCompiler() =
       let templateArgs =
         mfv.GenericParameters
         |> Seq.map (fun p -> $"typename {p.Name}")
-        |> String.concat ", "
+        |> Seq.toList
 
       Ast.Template(templateArgs, fn)
     else

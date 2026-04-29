@@ -6,60 +6,57 @@ type Ty = FSharpType
 type Mfv = FSharpMemberOrFunctionOrValue
 module P = FSharpExprPatterns
 
-type E<'t> =
-  | AddressOf of lvalue: 't
-  | AddressSet of lvalue: 't * rvalue: 't
-  | Application of f: 't * tys: Ty list * args: 't list
+// type E = E of E<E>
+
+type E =
+  | AddressOf of lvalue: E
+  | AddressSet of lvalue: E * rvalue: E
+  | Application of f: E * tys: Ty list * args: E list
   | Call of
-    o: 't option *
+    o: E option *
     mfv: Mfv *
     tyArgs1: Ty list *
     tyArgs2: Ty list *
-    args: 't list
-  | Coerce of target: Ty * e: 't
+    args: E list
+  | Coerce of target: Ty * e: E
   | FastIntegerForLoop of
-    start: 't *
-    limit: 't *
-    consume: 't *
+    start: E *
+    limit: E *
+    consume: E *
     isUp: bool
-  | ILAsm of asm: string * typeArgs: Ty list * args: 't list
-  | ILFieldGet of o: 't option * Ty * fieldName: string
-  | ILFieldSet of o: 't option * Ty * fieldName: string * value: 't
-  | IfThenElse of guard: 't * wt: 't * wf: 't
-  | Lambda of var: Mfv * body: 't
-  | Let of binding: Mfv * value: 't * body: 't
-  | LetRec of recursiveBindings: (Mfv * 't) list * body: 't
-  | NewArray of ty: Ty * values: 't list
-  | NewDelegate of ty: Ty * body: 't
-  | NewObject of ty: Mfv * tyArgs: Ty list * args: 't list
-  | NewRecord of ty: Ty * args: 't list
-  | NewTuple of ty: Ty * args: 't list
-  | Quote of q: 't
-  | FieldGet of o: 't option * ty: Ty * field: FSharpField
-  | AnonRecordGet of o: 't * ty: Ty * fieldIndex: int
-  | FieldSet of o: 't option * ty: Ty * field: FSharpField * value: 't
-  | Sequential of 't * 't
-  | TryFinally of body: 't * finalize: 't
-  | TryWith of
-    exprA: 't *
-    mfvA: Mfv *
-    exprB: 't *
-    mfvB: Mfv *
-    exprC: 't
-  | TupleGet of ty: Ty * index: int * from: 't
-  | DecisionTree of decision: 't * targets: (Mfv list * 't) list
+  | ILAsm of asm: string * typeArgs: Ty list * args: E list
+  | ILFieldGet of o: E option * Ty * fieldName: string
+  | ILFieldSet of o: E option * Ty * fieldName: string * value: E
+  | IfThenElse of guard: E * wt: E * wf: E
+  | Lambda of var: Mfv * body: E
+  | Let of binding: Mfv * value: E * body: E
+  | LetRec of recursiveBindings: (Mfv * E) list * body: E
+  | NewArray of ty: Ty * values: E list
+  | NewDelegate of ty: Ty * body: E
+  | NewObject of ty: Mfv * tyArgs: Ty list * args: E list
+  | NewRecord of ty: Ty * args: E list
+  | NewTuple of ty: Ty * args: E list
+  | Quote of q: E
+  | FieldGet of o: E option * ty: Ty * field: FSharpField
+  | AnonRecordGet of o: E * ty: Ty * fieldIndex: int
+  | FieldSet of o: E option * ty: Ty * field: FSharpField * value: E
+  | Sequential of E * E
+  | TryFinally of body: E * finalize: E
+  | TryWith of exprA: E * mfvA: Mfv * exprB: E * mfvB: Mfv * exprC: E
+  | TupleGet of ty: Ty * index: int * from: E
+  | DecisionTree of decision: E * targets: (Mfv list * E) list
   | DecisionTreeSuccess of
     decisionTargetIdx: int *
-    decisionTargetExprs: 't list
-  | TypeLambda of genParam: FSharpGenericParameter list * body: 't
-  | TypeTest of Ty * 't
-  | UnionCaseSet of 't * Ty * FSharpUnionCase * FSharpField * 't
-  | UnionCaseGet of 't * Ty * FSharpUnionCase * FSharpField
-  | UnionCaseTest of 't * Ty * FSharpUnionCase
-  | UnionCaseTag of 't * Ty
+    decisionTargetExprs: E list
+  | TypeLambda of genParam: FSharpGenericParameter list * body: E
+  | TypeTest of Ty * E
+  | UnionCaseSet of E * Ty * FSharpUnionCase * FSharpField * E
+  | UnionCaseGet of E * Ty * FSharpUnionCase * FSharpField
+  | UnionCaseTest of E * Ty * FSharpUnionCase
+  | UnionCaseTag of E * Ty
   | ObjectExpr of
     objType: Ty *
-    baseCall: 't *
+    baseCall: E *
     overrides: FSharpObjectExprOverride list *
     implementations: (Ty * FSharpObjectExprOverride list) list
   | TraitCall of
@@ -68,18 +65,29 @@ type E<'t> =
     typeArgs: FSharp.Compiler.Syntax.SynMemberFlags *
     typeInstantiation: Ty list *
     argTypes: Ty list *
-    arg'txprs: 't list
-  | ValueSet of toSet: Mfv * value: 't
-  | WhileLoop of guard: 't * body: 't
+    argExprs: E list
+  | ValueSet of toSet: Mfv * value: E
+  | WhileLoop of guard: E * body: E
   | BaseValue of Ty
   | DefaultValue of Ty
   | ThisValue of Ty
   | Const of obj * Ty
   | Value of Mfv
-  /// For debugging
-  | Unknown of obj
 
-type E = E of E<E>
+  static let metadata =
+    System.Runtime.CompilerServices.ConditionalWeakTable()
+
+  member internal this.Associate (e: FSharpExpr) =
+    metadata.AddOrUpdate(this, e)
+    this
+
+  member this.Type =
+    // match typesTable.TryGetValue this with
+    // | true, t -> t
+    // | false, _ -> failwith $"No type information for {this}"
+    match metadata.TryGetValue this with
+    | true, e -> e.Type
+    | false, _ -> failwith $"No type information for {this}"
 
 let rec convert (e: FSharpExpr) : E =
   match e with
@@ -187,7 +195,8 @@ let rec convert (e: FSharpExpr) : E =
   | P.Const(foo, ty) -> Const(foo, ty)
   | P.Value mfv -> Value mfv
   | _ -> failwith "Unrecognized"
-  |> E
+  |> _.Associate(e)
+// |> E
 
 let rec visitExpr f (n: int) (e: FSharpExpr) =
   f n e
