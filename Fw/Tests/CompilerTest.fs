@@ -179,6 +179,23 @@ main ()
     xunit.WriteLine result.code
 
   [<Fact>]
+  let ``list collection`` () =
+    let src =
+      "
+let xs = ResizeArray()
+let mutable sum = 0
+for i in 1..10 do 
+    xs.Add (i * 2)
+for n in xs do
+    sum <- sum + n
+
+System.Console.WriteLine(sum)
+"
+
+    let result = compileAndRunCode "list collection" src
+    xunit.WriteLine result.code
+
+  [<Fact>]
   let ``basic struct`` () =
     let src =
       "
