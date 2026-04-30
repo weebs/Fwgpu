@@ -38,7 +38,10 @@ type CppDecl =
     body: CppStmt list option
   | Struct of CppStruct
   | Comment of string
-  | Variable of name: string * ty: CppTy * value: CppExpr option
+  | Variable of
+    name: string *
+    ty: CppTy *
+    value: CppExpr option
   /// Synthetic: Helper so functions can return multiple declarations
   | Sequence of CppDecl list
 
@@ -76,9 +79,21 @@ and CppStmt =
   | SComment of string
   | Return of CppExpr
   | Assign of dest: CppExpr * value: CppExpr
-  | IfThenElse of cond: CppExpr * wt: CppStmt list * wf: CppStmt list
+  | ForLoop of
+    init: CppStmt *
+    cond: CppExpr *
+    post: CppStmt *
+    body: CppStmt list
+  | WhileLoop of cond: CppExpr * body: CppStmt list
+  | IfThenElse of
+    cond: CppExpr *
+    wt: CppStmt list *
+    wf: CppStmt list
   | Scope of CppStmt list
-  | SVariable of name: string * ty: CppTy * value: CppExpr option
+  | SVariable of
+    name: string *
+    ty: CppTy *
+    value: CppExpr option
   | TryCatch of
     tryBlock: CppStmt list *
     catchArgs: string *
@@ -101,11 +116,17 @@ let rec print (e: CppExpr) =
   | Var s -> s
   | Const(o, ``type``) -> $"%A{o}"
   | Call(callee, args) ->
-    let txtArgs = args |> List.map print |> String.concat ", "
+    let txtArgs =
+      args |> List.map print |> String.concat ", "
+
     $"{print callee}({txtArgs})"
   | CallGen(callee, genArgs, args) ->
-    let txtArgs = args |> List.map print |> String.concat ", "
-    let txtGenArgs = genArgs |> List.map print |> String.concat ", "
+    let txtArgs =
+      args |> List.map print |> String.concat ", "
+
+    let txtGenArgs =
+      genArgs |> List.map print |> String.concat ", "
+
     $"{print callee}<{txtGenArgs}>({txtArgs})"
   | Lambda(args, body, captures) ->
     let txtArgs =
@@ -135,6 +156,10 @@ and printStmt (s: CppStmt) =
   | SVariable(name, ty, None) -> $"{printType ty} {name}"
   | TryCatch(tryBlock, catchArgs, catchBlock) ->
     $"try {{{printBody tryBlock}}} catch ({catchArgs}) {{{printBody catchBlock}}}"
+  | WhileLoop(cond, body) ->
+    $"while ({print cond}) {{{printBody body}}}"
+  | ForLoop(init, cond, post, body) ->
+    $"for ({printStmt init}; {print cond}; {printStmt post}) {{{printBody body}}}"
 
 and printBody (body: CppStmt list) =
   (body |> List.map printStmt |> String.concat ";") + ";"
@@ -147,11 +172,15 @@ and printType (ty: CppTy) =
   | Int -> "int"
   | Bool -> "bool"
   | Gen(template, args) ->
-    let txtArgs = args |> List.map printType |> String.concat ", "
+    let txtArgs =
+      args |> List.map printType |> String.concat ", "
+
     $"{template}<{txtArgs}>"
 
 let private addReturn' (s: CppStmt) =
   match s with
+  | WhileLoop _
+  | ForLoop _
   | Scope _
   | SVariable _
   | SComment _ -> s
@@ -183,7 +212,10 @@ let printArgs (args: ArgSig) =
 let printFsig (name: string) (fsig: FunctionSignature) =
   $"{printType fsig.rt} {name}({printArgs fsig.args})"
 
-let printFimplDecl (name: string) (fsig: FunctionSignature) =
+let printFimplDecl
+  (name: string)
+  (fsig: FunctionSignature)
+  =
   $"{printType fsig.rt} {name}({printArgs fsig.args})"
 
 let printClass (c: CppClass) =
@@ -227,15 +259,21 @@ let rec printDecl (decl: CppDecl) =
   | Template(args, decl) ->
     let txtArgs = String.concat ", " args
     $"template<{txtArgs}> {printDecl decl}"
-  | Constructor(tyName, args, None) -> $"{tyName}({printArgs args});"
-  | Function(name, signature, None) -> $"{printFsig name signature};"
+  | Constructor(tyName, args, None) ->
+    $"{tyName}({printArgs args});"
+  | Function(name, signature, None) ->
+    $"{printFsig name signature};"
   | Constructor(tyName, args, Some body) ->
     let names = args |> List.map fst
+
     let txtBody = shadowVariables names body |> printBody
+
     $"{tyName}({printArgs args}) {{ {txtBody} }}"
   | Function(name, signature, Some body) ->
     let names = signature.args |> List.map fst
+
     let txtBody = shadowVariables names body |> printBody
+
     $"{printFsig name signature} {{ {txtBody} }}"
 
 let rec shadowVariables
@@ -247,16 +285,35 @@ let rec shadowVariables
     match stmt with
     | SVariable(name, ty, value) as svar ->
       if List.contains name vars then
-        [ Scope(svar :: shadowVariables (name :: vars) rest) ]
+        [
+          Scope(svar :: shadowVariables (name :: vars) rest)
+        ]
       else
         svar :: shadowVariables (name :: vars) rest
     | IfThenElse(cond, wt, wf) ->
-      IfThenElse(cond, shadowVariables [] wt, shadowVariables [] wf)
+      IfThenElse(
+        cond,
+        shadowVariables [] wt,
+        shadowVariables [] wf
+      )
       :: shadowVariables vars rest
     | TryCatch(tb, cargs, cb) ->
-      TryCatch(shadowVariables [] tb, cargs, shadowVariables [] cb)
+      TryCatch(
+        shadowVariables [] tb,
+        cargs,
+        shadowVariables [] cb
+      )
       :: shadowVariables vars rest
     | Scope block -> [ Scope(shadowVariables [] block) ]
+    | WhileLoop(cond, body) ->
+      WhileLoop(cond, shadowVariables vars body) :: rest
+    | ForLoop(init, cond, post, body) ->
+      // todo : add init variable to vars list
+      match shadowVariables vars [ init ] with
+      | init :: [] ->
+        let body = shadowVariables vars body
+        ForLoop(init, cond, post, body) :: rest
+      | _ -> failwith "TODO Complex init for loop"
     | Let(name, value) as l ->
       if List.contains name vars then
         [ Scope(l :: shadowVariables (name :: vars) rest) ]

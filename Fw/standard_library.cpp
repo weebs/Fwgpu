@@ -29,10 +29,26 @@ public:
   virtual void System_IDisposable_Dispose() {};
 };
 namespace Collections {
+class IEnumerator : public IDisposable {
+public:
+  IEnumerator GetEnumerator();
+};
+template <typename T> class IEnumerator_1 : public IDisposable {
+public:
+  IEnumerator_1<T> GetEnumerator();
+  bool MoveNext();
+  T get_Current();
+};
 class IStructuralEquatable {};
 class IStructuralComparable {};
 class IComparer {};
 class IEqualityComparer {};
+namespace Generic {
+template <typename T> class List_1 : public IEnumerator_1<T> {
+public:
+  void Add(T value);
+};
+} // namespace Generic
 } // namespace Collections
 namespace Console {
 void WriteLine(std::string s) { std::cout << s << std::endl; }
@@ -64,7 +80,7 @@ int GenericHashWithComparer(
 namespace IntrinsicFunctions {
 template <typename T> T UnboxGeneric(std::shared_ptr<System::Object> obj) {
   return std::dynamic_pointer_cast<typename T::element_type>(obj);
-//   return std::dynamic_pointer_cast<T>(obj);
+  //   return std::dynamic_pointer_cast<T>(obj);
 }
 } // namespace IntrinsicFunctions
 } // namespace LanguagePrimitives
@@ -75,10 +91,18 @@ template <typename T> T op_RightShift(T x, int n) { return x >> n; }
 template <typename A, typename B, typename C> C op_Addition(A x, B y) {
   return x + y;
 }
+template <typename A, typename B, typename C> C op_Multiply(A x, B y) {
+  return x * y;
+}
 // std::string ToString(int x) { return std::string(""); }
 std::string ToString(int x) { return std::to_string(x); }
 template <typename T> std::string ToString(T x) { return x->ToString(); }
 } // namespace Operators
 } // namespace Core
+namespace Collections {
+// template <typename T> class ResizeArray_1 {};
+template <typename T>
+using ResizeArray_1 = System::Collections::Generic::List_1<T>;
+} // namespace Collections
 } // namespace FSharp
 } // namespace Microsoft

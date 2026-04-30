@@ -11,7 +11,8 @@ let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
     let cpp = entTypeName ent
     let path = cpp + "::" + mfv.CompiledName
     path
-  | None -> failwith "Empty declaring entity for module variable"
+  | None ->
+    failwith "Empty declaring entity for module variable"
 
 let isUnit (t: FSharpType) =
   try
@@ -21,7 +22,9 @@ let isUnit (t: FSharpType) =
       t.ErasedType.BasicQualifiedName = "Microsoft.FSharp.Core.Unit"
     then
       true
-    elif t.BasicQualifiedName = "Microsoft.FSharp.Core.unit" then
+    elif
+      t.BasicQualifiedName = "Microsoft.FSharp.Core.unit"
+    then
       true
     else
       false
@@ -31,14 +34,30 @@ let isUnit (t: FSharpType) =
 
 let fieldName (field: FSharpField) = field.Name
 
-let toCppPath (s: string) = s.Replace("+", "::").Replace(".", "::")
+let toCppPath (s: string) =
+  s.Replace("+", "::").Replace(".", "::").Replace("`", "_")
 
 let typeName (t: FSharpType) =
-  (if t.BasicQualifiedName = "Microsoft.FSharp.Core.obj" then
-     "System::Object"
-   else
-     t.TypeDefinition.BasicQualifiedName |> toCppPath)
-  |> _.Replace("`", "_")
+  let baseTy =
+    if
+      t.BasicQualifiedName = "Microsoft.FSharp.Core.obj"
+    then
+      "System::Object"
+    else
+      // todo
+      // t.TypeDefinition.BasicQualifiedName |> toCppPath
+      t.BasicQualifiedName |> toCppPath
+
+  if t.GenericArguments.Count = 0 then
+    baseTy
+  else
+    let args =
+      t.GenericArguments
+      |> Seq.map tyConvert
+      |> Seq.map printType
+      |> String.concat ", "
+
+    $"{baseTy}<{args}>"
 
 let entTypeName (ent: FSharpEntity) =
   ent.BasicQualifiedName |> toCppPath
@@ -65,12 +84,16 @@ let rec translate (e: FSharpExpr) : CppExpr =
   // )
   | P.DecisionTreeSuccess(idx, exprs) ->
     Call(Var $"_{idx}", List.map translate exprs)
-  | P.Coerce(ty, value) when ty.TypeDefinition.IsValueType = true ->
+  | P.Coerce(ty, value) when
+    ty.TypeDefinition.IsValueType = true
+    ->
     let cppTy = tyConvert ty
 
     Var
       $"*({printType cppTy}*){translate value |> print}->__data /* TODO Proper obj type test and read */"
-  | P.Coerce(ty, value) when ty.TypeDefinition.IsValueType = false ->
+  | P.Coerce(ty, value) when
+    ty.TypeDefinition.IsValueType = false
+    ->
     let (Gen("Gc", [ tyTarget ])) = tyConvert ty
 
     CallGen(
@@ -89,7 +112,10 @@ let rec translate (e: FSharpExpr) : CppExpr =
     Call(Var path, List.map translate args)
   | P.Call(None, mfv, xs, ys, args) ->
     let path = qualifiedPath mfv
-    let genArgs = ys |> List.map (tyConvert >> printType >> Var)
+
+    let genArgs =
+      ys |> List.map (tyConvert >> printType >> Var)
+
     CallGen(Var path, genArgs, List.map translate args)
   | P.Call(Some o, mfv, xs, ys, args) ->
     let case =
@@ -110,7 +136,8 @@ let rec translate (e: FSharpExpr) : CppExpr =
         translateS body |> addReturn
 
     if
-      mfv.IsCompilerGenerated && mfv.DisplayName.StartsWith "unitVar"
+      mfv.IsCompilerGenerated
+      && mfv.DisplayName.StartsWith "unitVar"
     then
       Lambda([], stmts, [])
     else
@@ -125,20 +152,32 @@ let rec translate (e: FSharpExpr) : CppExpr =
       DerefGetField(translate expr, fieldName field)
     | P.Value mfv when
       mfv.IsMemberThisValue
-      || mfv.CompiledName = "this" && mfv.IsCompilerGenerated
+      || mfv.CompiledName = "this"
+         && mfv.IsCompilerGenerated
       ->
       DerefGetField(Var "this", fieldName field)
     | _ -> GetField(translate expr, fieldName field)
   | P.NewObject(mfv, tys, args) ->
-    let ctorPath = entTypeName mfv.DeclaringEntity.Value
+    let basePath = entTypeName mfv.DeclaringEntity.Value
+
+    let ctor =
+      if tys.Length = 0 then
+        basePath
+      else
+        let args =
+          tys
+          |> List.map (tyConvert >> printType)
+          |> String.concat ", " in
+
+        $"{basePath}<{args}>"
 
     if mfv.DeclaringEntity.Value.IsValueType then
-      Call(Var ctorPath, List.map translate args)
+      Call(Var ctor, List.map translate args)
     else
       CallGen(
         Var "std::make_shared",
-        [ Var ctorPath ],
-        [ Call(Var ctorPath, List.map translate args) ]
+        [ Var ctor ],
+        [ Call(Var ctor, List.map translate args) ]
       )
   | P.Let((mfv, value, dbg), body) ->
     let var = Let(mfv.CompiledName, translate value)
@@ -163,7 +202,10 @@ let rec translate (e: FSharpExpr) : CppExpr =
 
 and translateS (e: FSharpExpr) : CppStmt list =
   match e with
-  | P.Let((mfv, (P.AddressOf(P.Value valueMfv) as value), dbg), body) when
+  | P.Let((mfv,
+           (P.AddressOf(P.Value valueMfv) as value),
+           dbg),
+          body) when
     mfv.CompiledName = valueMfv.CompiledName
     ->
     let cppTy = tyConvert mfv.FullType
@@ -187,14 +229,59 @@ and translateS (e: FSharpExpr) : CppStmt list =
       let case =
         match dest with
         | P.ThisValue _ -> DerefGetField
-        | P.Value mfv when mfv.IsMemberThisValue -> DerefGetField
+        | P.Value mfv when mfv.IsMemberThisValue ->
+          DerefGetField
         | _ -> GetField
 
-      Assign(case (translate dest, fieldName field), translate value)
+      Assign(
+        case (translate dest, fieldName field),
+        translate value
+      )
     ]
   | P.IfThenElse(cond, wt, wf) -> [
-      IfThenElse(translate cond, translateS wt, translateS wf)
+      IfThenElse(
+        translate cond,
+        translateS wt,
+        translateS wf
+      )
     ]
+  | P.WhileLoop(cond, body, dbg) -> [
+      WhileLoop(translate cond, translateS body)
+    ]
+  | P.FastIntegerForLoop(from, until, body, isUp, dbgA, dbgB) ->
+    match body with
+    | P.Lambda(var, expr) ->
+      let frm = translate from
+      let untl = translate until
+      let bdy = translateS expr
+      // todo fix this hack
+      let cond =
+        if isUp then
+          $"{var.CompiledName} <= {print untl}"
+        else
+          $"{var.CompiledName} >= {print untl}"
+
+      let post =
+        if isUp then
+          $"{var.CompiledName}++"
+        else
+          $"{var.CompiledName}--"
+
+      [
+        ForLoop(
+          SVariable(
+            var.CompiledName,
+            tyConvert var.FullType,
+            Some frm
+          ),
+          Var cond,
+          Exp(Var post),
+          bdy
+        )
+      ]
+    | _ ->
+      failwith
+        $"not sure how to convert integer for loop %A{e}"
   | P.DecisionTree(decision, targets) ->
     let desc = translateS decision
 
@@ -220,20 +307,28 @@ and translateS (e: FSharpExpr) : CppStmt list =
   | P.TryFinally(tryExpr, finallyExpr, dbgTry, dbgFinally) ->
     let tryBody = translateS tryExpr
     let finallyBody = translateS finallyExpr
-    let tryLambda = Lambda([], tryBody |> addReturn, [ "&" ])
-    let finallyLambda = Lambda([], finallyBody, [ "&" ])
 
     [
-      SVariable("tryBody", Auto, Some tryLambda)
-      SVariable("finally", Auto, Some finallyLambda)
-      SVariable("result", tyConvert tryExpr.Type, None)
-      TryCatch(
-        [ Assign(Var "result", Call(Var "tryBody", [])) ],
-        "...",
-        []
-      )
-      Exp(Call(Var "finally", []))
-      Exp(Var "result")
+      if isUnit tryExpr.Type then
+        TryCatch(tryBody, "...", [])
+        yield! finallyBody
+      else
+        let tryLambda =
+          Lambda([], tryBody |> addReturn, [ "&" ])
+
+        let finallyLambda = Lambda([], finallyBody, [ "&" ])
+        SVariable("tryBody", Auto, Some tryLambda)
+        SVariable("finally", Auto, Some finallyLambda)
+        SVariable("result", tyConvert tryExpr.Type, None)
+
+        TryCatch(
+          [ Assign(Var "result", Call(Var "tryBody", [])) ],
+          "...",
+          []
+        )
+
+        Exp(Call(Var "finally", []))
+        Exp(Var "result")
     ]
   | P.TryWith(a, mfvA, b, mfvB, c, dbgTry, dbgWith) -> [
       SComment "Try"
@@ -248,7 +343,10 @@ and translateS (e: FSharpExpr) : CppStmt list =
 let funTyConvert (t: FSharpType) =
   let a = t.GenericArguments[0]
   let b = t.GenericArguments[1]
-  let args = if isUnit a then "" else $"{printType (tyConvert a)}"
+
+  let args =
+    if isUnit a then "" else $"{printType (tyConvert a)}"
+
   let rt = printType (tyConvert b)
   Gen("std::function", [ Named $"{rt}({args})" ])
 
@@ -268,7 +366,8 @@ let tyConvert (t: FSharpType) =
       | "bool" -> Bool
       | "byref`1" ->
         // Named $"&{tyConvert t.GenericArguments[0] |> printType}"
-        Named $"{tyConvert t.GenericArguments[0] |> printType}*"
+        Named
+          $"{tyConvert t.GenericArguments[0] |> printType}*"
       | "obj" -> Gen("Gc", [ Named "System::Object" ])
       | _ -> Auto
     | _ ->

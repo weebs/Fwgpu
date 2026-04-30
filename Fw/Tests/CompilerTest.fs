@@ -44,7 +44,9 @@ let compileAndRunCode (testName: string) (src: string) =
 
   CliWrap.Cli
     .Wrap(o)
-    .WithStandardOutputPipe(CliWrap.PipeTarget.ToStringBuilder sb)
+    .WithStandardOutputPipe(
+      CliWrap.PipeTarget.ToStringBuilder sb
+    )
     .ExecuteAsync()
     .Task.Result
   |> ignore
@@ -58,6 +60,7 @@ type TestClass(xunit: ITestOutputHelper) =
   [<Fact>]
   let ``hello world`` () =
     let src = "System.Console.WriteLine(\"Hello, world!\")"
+
     let result = compileAndRunCode "hello_world" src
     xunit.WriteLine result.code
     Assert.Equal("Hello, world!\n", result.output)
@@ -117,6 +120,7 @@ type AdderWithN(n: int) =
     let cc = CppCompiler()
     let code = cc.Compile sourceCode
     xunit.WriteLine $"{sourceCode}\n{code}\n=========="
+
     let fullCode = Deps.core + "\n" + code |> Format.source
 
     File.WriteAllText(
@@ -137,6 +141,7 @@ System.Console.WriteLine result
   "
 
     let result = compileAndRunCode "basic_class" sourceCode
+
     xunit.WriteLine result.code
     Assert.Equal("42\n", result.output)
 
@@ -210,4 +215,5 @@ System.Console.WriteLine(f.Add(2))"
   [<Fact>]
   let ``id works`` () =
     let result = compileAndRunCode "id_works" "let id x = x"
+
     xunit.WriteLine result.code
