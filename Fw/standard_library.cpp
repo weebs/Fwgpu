@@ -1,7 +1,9 @@
 #include <iostream>
 #include <any>
 // #include <memory>
+#include <memory>
 #include <string>
+#include <type_traits>
 static std::ios_base::Init stream_initializer;
 // template <typename T> using Gc = std::shared_ptr<T>;
 template <typename T> using Gc = T *;
@@ -23,13 +25,15 @@ public:
 
 public:
   // void *__data; // TODO : deleting in the destructor
-  std::any __data;
+  std::any __data = 42;
 };
 template <typename T> bool IsType(Gc<System::Object> obj) {
-  // return std::dynamic_pointer_cast<T>(obj) != nullptr;
-  // return dynamic_cast<T>(obj) != nullptr;
-  // return std::any_cast<T> != nullptr;
-  return obj->__data.type() == typeid(T);
+  if constexpr (std::is_pointer_v<T>) {
+    return dynamic_cast<T>(obj) != nullptr;
+  }
+  else {
+    return obj->__data.type() == typeid(T);
+  }
 }
 template <typename T> class IComparable_1 {};
 class IComparable {};
@@ -126,17 +130,12 @@ int GenericHashWithComparer(Gc<System::Collections::IEqualityComparer> comp, T a
 namespace IntrinsicFunctions {
 template <typename T> T UnboxGeneric(Gc<System::Object> obj) {
   // return std::dynamic_pointer_cast<typename T::element_type>(obj);
-  // if (dynamic_cast<T*>(obj->__data) != nullptr) {
-  //   return *dynamic_cast<T*>(obj->__data);
-  // }
-  // if (std::any_cast<T>(obj->__data) != nullptr) {
-  //   return std::any_cast<T>(obj->__data);
-  // }
-  // if (obj->__data.type() == typeid(T)) {
+  if constexpr (std::is_pointer_v<T>) {
+    return dynamic_cast<T>(obj);
+  }
+  else {
     return std::any_cast<T>(obj->__data);
-  // }
-  // return dynamic_cast<T>(obj);
-  //   return std::dynamic_pointer_cast<T>(obj);
+  }
 }
 } // namespace IntrinsicFunctions
 } // namespace LanguagePrimitives

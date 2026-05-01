@@ -66,14 +66,15 @@ let rec translate (e: FSharpExpr) : CppExpr =
   match e with
   | P.AddressOf expr -> Var $"&{translate expr |> print}"
   | P.TypeTest(ty, expr) ->
-    let tyTarget =
-      // if ty.TypeDefinition.IsValueType then
-      //   tyConvert ty
-      if not (requiresGc ty) then
-        tyConvert ty
-      else
-        let (Gen("Gc", [ tyTarget ])) = tyConvert ty
-        tyTarget
+    let tyTarget = tyConvert ty
+    // if ty.TypeDefinition.IsValueType then
+    //   tyConvert ty
+    // if not (requiresGc ty) then
+    //   tyConvert ty
+    // else
+    //   let tyTarget = tyConvert ty
+    //   // let (Gen("Gc", [ tyTarget ])) = cppTy
+    //   tyTarget
 
     CallGen(
       Var "System::IsType",
@@ -392,10 +393,8 @@ let requiresGc (t: FSharpType) =
       | "int" -> false
       | "int32" -> false
       | "bool" -> false
-      // | "byref`1" ->
-      //   // Named $"&{tyConvert t.GenericArguments[0] |> printType}"
-      //   Named
-      //     $"{tyConvert t.GenericArguments[0] |> printType}*"
+      | "byref`1" -> false
+      // $"{tyConvert t.GenericArguments[0] |> printType}*"
       | "obj" -> true
       | _ ->
         failwith

@@ -183,7 +183,9 @@ main ()
   "
 
     let result = compileAndRunCode "idisposable" src
+    let expected = "System.Object\nDisposing...\n"
     xunit.WriteLine result.code
+    Assert.Equal(expected, result.output)
 
   [<Fact>]
   let ``list collection`` () =
