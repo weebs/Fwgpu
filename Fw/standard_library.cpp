@@ -1,7 +1,6 @@
-#include <iostream>
 #include <any>
+#include <iostream>
 // #include <memory>
-#include <memory>
 #include <string>
 #include <type_traits>
 static std::ios_base::Init stream_initializer;
@@ -25,13 +24,12 @@ public:
 
 public:
   // void *__data; // TODO : deleting in the destructor
-  std::any __data = 42;
+  std::any __data;
 };
 template <typename T> bool IsType(Gc<System::Object> obj) {
   if constexpr (std::is_pointer_v<T>) {
     return dynamic_cast<T>(obj) != nullptr;
-  }
-  else {
+  } else {
     return obj->__data.type() == typeid(T);
   }
 }
@@ -52,9 +50,11 @@ public:
 };
 template <typename T> class IEnumerator_1 : public IDisposable {
 public:
-  IEnumerator_1<T>* GetEnumerator();
+  IEnumerator_1<T> *GetEnumerator();
   bool MoveNext() { return this->System_Collections_IEnumerator_1_MoveNext(); }
-  T get_Current() { return this->System_Collections_IEnumerator_1_get_Current(); }
+  T get_Current() {
+    return this->System_Collections_IEnumerator_1_get_Current();
+  }
   void Reset() { this->System_Collections_IEnumerator_1_Reset(); }
   virtual bool System_Collections_IEnumerator_1_MoveNext() = 0;
   virtual T System_Collections_IEnumerator_1_get_Current() = 0;
@@ -69,17 +69,20 @@ class IEqualityComparer {};
 namespace Generic {
 template <typename T> class List_1 : IEnumerable_1<T> {
   std::vector<T> items;
+
 public:
   class Enumerator : public IEnumerator_1<T> {
     int index = 0;
     T current;
-    List_1<T>* list;
+    List_1<T> *list;
+
   public:
-    Enumerator(List_1<T>* xs) : list(xs) {}
+    Enumerator(List_1<T> *xs) : list(xs) {}
     bool System_Collections_IEnumerator_1_MoveNext() override {
       if (index < list->items.size()) {
         current = list->items[index];
-        index++; return true;
+        index++;
+        return true;
       }
       index = -1;
       return false;
@@ -87,17 +90,10 @@ public:
     T System_Collections_IEnumerator_1_get_Current() override {
       return current;
     }
-    void System_Collections_IEnumerator_1_Reset() override {
-      index = 0;
-    }
+    void System_Collections_IEnumerator_1_Reset() override { index = 0; }
   };
-  void Add(T value)
-  {
-    items.push_back(value);
-  }
-  List_1::Enumerator GetEnumerator() {
-    return Enumerator(this);
-  }
+  void Add(T value) { items.push_back(value); }
+  List_1::Enumerator GetEnumerator() { return Enumerator(this); }
 };
 } // namespace Generic
 } // namespace Collections
@@ -114,8 +110,8 @@ Gc<System::Collections::IComparer> GenericComparer;
 Gc<System::Collections::IEqualityComparer> GenericEqualityComparer;
 template <typename T> bool GenericEqualityER(T a, T b) { return a == b; }
 template <typename T>
-bool GenericEqualityWithComparer(Gc<System::Collections::IEqualityComparer>, T a,
-                                 T b) {
+bool GenericEqualityWithComparer(Gc<System::Collections::IEqualityComparer>,
+                                 T a, T b) {
   return false;
 }
 template <typename T>
@@ -124,7 +120,8 @@ int GenericComparisonWithComparer(Gc<System::Collections::IComparer> comp, T a,
   return 0;
 }
 template <typename T>
-int GenericHashWithComparer(Gc<System::Collections::IEqualityComparer> comp, T a) {
+int GenericHashWithComparer(Gc<System::Collections::IEqualityComparer> comp,
+                            T a) {
   return 0;
 }
 namespace IntrinsicFunctions {
@@ -132,8 +129,7 @@ template <typename T> T UnboxGeneric(Gc<System::Object> obj) {
   // return std::dynamic_pointer_cast<typename T::element_type>(obj);
   if constexpr (std::is_pointer_v<T>) {
     return dynamic_cast<T>(obj);
-  }
-  else {
+  } else {
     return std::any_cast<T>(obj->__data);
   }
 }
