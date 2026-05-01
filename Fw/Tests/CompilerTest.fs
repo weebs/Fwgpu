@@ -35,7 +35,9 @@ let compileAndRunCode (testName: string) (src: string) =
     // .Wrap("clang++")
     // .WithArguments([ outPath; "-o"; o ])
     .Wrap("zig")
-    .WithArguments([ "c++"; "-g"; outPath; "-o"; o ])
+    .WithArguments(
+      [ "c++"; "-std=c++17"; "-g"; outPath; "-o"; o ]
+    )
     .ExecuteAsync()
     .Task.Result
   |> ignore
@@ -193,6 +195,10 @@ for i in 1..10 do
     xs.Add (i * 2)
 for n in xs do
     sum <- sum + n
+
+let ope () =
+  for n in xs do
+    System.Console.WriteLine n
 
 System.Console.WriteLine(sum)
 "

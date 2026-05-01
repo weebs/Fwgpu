@@ -38,7 +38,11 @@ module Format =
     let result = cmd.ExecuteBufferedAsync().Task.Result
     result.StandardOutput
 
-let parseAndTypeCheckSingleFile (checker: FSharpChecker) file input =
+let parseAndTypeCheckSingleFile
+  (checker: FSharpChecker)
+  file
+  input
+  =
   async {
     // Get context representing a stand-alone (script) file
     let! projOptions, errors =
@@ -49,13 +53,19 @@ let parseAndTypeCheckSingleFile (checker: FSharpChecker) file input =
       )
 
     let! parseFileResults, checkFileResults =
-      checker.ParseAndCheckFileInProject(file, 0, input, projOptions)
+      checker.ParseAndCheckFileInProject(
+        file,
+        0,
+        input,
+        projOptions
+      )
 
     // Wait until type checking succeeds (or 100 attempts)
     match checkFileResults with
     | FSharpCheckFileAnswer.Succeeded(res) ->
       return parseFileResults, res
-    | res -> return failwithf "Parsing did not finish... (%A)" res
+    | res ->
+      return failwithf "Parsing did not finish... (%A)" res
   }
 
 type Logger() =
@@ -74,7 +84,8 @@ type CppCompiler() =
   let types = Dictionary()
 
 
-  let checker = FSharpChecker.Create(keepAssemblyContents = true)
+  let checker =
+    FSharpChecker.Create(keepAssemblyContents = true)
 
   let argFromField (field: FSharpField) =
     field.Name, Transform.tyConvert field.FieldType
@@ -105,7 +116,8 @@ type CppCompiler() =
     |> Seq.collect id
     |> Seq.toList
     |> List.filter (not << Transform.isUnit << _.Type)
-    |> List.map (fun p -> (p.FullName, Transform.tyConvert p.Type))
+    |> List.map (fun p ->
+      (p.FullName, Transform.tyConvert p.Type))
 
   let argsFromFunction (mfv: FsMfv) =
     // todo : Properly uncurry
@@ -128,7 +140,9 @@ type CppCompiler() =
         (SourceText.ofString code)
       |> Async.RunSynchronously
 
-    let rec loop (decl: FSharpImplementationFileDeclaration) =
+    let rec loop
+      (decl: FSharpImplementationFileDeclaration)
+      =
       match decl with
       | FsImplFileDecl.Entity(ent, decls) ->
         if not (types.ContainsKey(ent.FullName)) then
@@ -136,7 +150,9 @@ type CppCompiler() =
 
         for d in decls do
           loop d
-      | FsImplFileDecl.MemberOrFunctionOrValue(mfv, args, body) ->
+      | FsImplFileDecl.MemberOrFunctionOrValue(mfv,
+                                               args,
+                                               body) ->
         match mfv.DeclaringEntity with
         | Some ent ->
           if not (types.ContainsKey(ent.FullName)) then
@@ -146,7 +162,9 @@ type CppCompiler() =
         | None -> printfn "???"
       | _ -> ()
 
-    List.iter loop file.ImplementationFile.Value.Declarations
+    List.iter
+      loop
+      file.ImplementationFile.Value.Declarations
 
     file.ImplementationFile.Value.Declarations
     |> List.map this.ProcessDecl
@@ -158,7 +176,9 @@ type CppCompiler() =
     match decl with
     | FsImplFileDecl.Entity(entity, declarations) ->
       this.ProcessEntity entity declarations
-    | FsImplFileDecl.MemberOrFunctionOrValue(mfv, curriedArgs, body) ->
+    | FsImplFileDecl.MemberOrFunctionOrValue(mfv,
+                                             curriedArgs,
+                                             body) ->
       this.ProcessMfv mfv curriedArgs body
     | FsImplFileDecl.InitAction action ->
       this.ProcessInitAction action
@@ -182,7 +202,8 @@ type CppCompiler() =
     let fields =
       entity.FSharpFields
       |> Seq.map argFromField
-      |> Seq.map (fun (name, ty) -> Ast.Variable(name, ty, None))
+      |> Seq.map (fun (name, ty) ->
+        Ast.Variable(name, ty, None))
       |> Seq.toList
 
     let ctors =
@@ -249,7 +270,8 @@ type CppCompiler() =
       |> Seq.collect id
       |> Seq.toList
       |> List.filter (not << Transform.isUnit << _.Type)
-      |> List.map (fun p -> (p.FullName, Transform.tyConvert p.Type))
+      |> List.map (fun p ->
+        (p.FullName, Transform.tyConvert p.Type))
     // let args = toArgs mfv.CurriedParameterGroups
     let args = toMethodArgs mfv.CurriedParameterGroups
 
@@ -276,7 +298,8 @@ type CppCompiler() =
       if Transform.isUnit body.Type then
         Transform.translateS body
       elif
-        not body.Type.IsFunctionType && Transform.isUnit body.Type
+        not body.Type.IsFunctionType
+        && Transform.isUnit body.Type
       then
         Transform.translateS body
       else
@@ -310,7 +333,11 @@ type CppCompiler() =
           Ast.Comment
             $"?? MemberOrFunctionOrValue {mfv}: %A{curriedArgs} -> {mfv.ReturnParameter.Type}"
         // Ast.Function (mfv.CompiledName, [], rt, stmts)
-        Ast.Function(funcName, { args = []; rt = rt }, Some stmts)
+        Ast.Function(
+          funcName,
+          { args = []; rt = rt },
+          Some stmts
+        )
       ]
 
   member private this.Constructor mfv curriedArgs body =
@@ -321,8 +348,13 @@ type CppCompiler() =
 
     let args = argsFromFunction mfv
     let stmts = Transform.translateS fix
-    let fixStmts = stmts |> List.rev |> List.tail |> List.rev
-    let className = $"{mfv.DeclaringEntity.Value.CompiledName}"
+
+    let fixStmts =
+      stmts |> List.rev |> List.tail |> List.rev
+
+    let className =
+      $"{mfv.DeclaringEntity.Value.CompiledName}"
+
     let name = $"{className}::{className}"
     Ast.Constructor(name, args, Some fixStmts)
 
@@ -346,14 +378,20 @@ type CppCompiler() =
     let name =
       if mfv.IsMember then
         // Transform.qualifiedPath mfv
-        let className = mfv.DeclaringEntity.Value.CompiledName
+        let className =
+          mfv.DeclaringEntity.Value.CompiledName
         // Replace interface methods "." with "_"
         let funcName = mfv.CompiledName.Replace(".", "_")
         $"{className}::{funcName}"
       else
         mfv.CompiledName
 
-    let fn = Ast.Function(name, { args = args; rt = rt }, Some stmts)
+    let fn =
+      Ast.Function(
+        name,
+        { args = args; rt = rt },
+        Some stmts
+      )
 
     if mfv.GenericParameters.Count > 0 then
       let templateArgs =
@@ -366,6 +404,5 @@ type CppCompiler() =
       fn
 
   member private this.Value mfv body =
-    let ty = Transform.tyConvert mfv.FullType
-    let value = Transform.translate body
-    Ast.Variable(mfv.CompiledName, ty, Some value)
+    let name, ty, value = Transform.translateVar mfv body
+    Ast.Variable(name, ty, Some value)
