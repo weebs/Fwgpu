@@ -35,7 +35,7 @@ template <typename T> bool IsType(Gc<System::Object> obj) {
 }
 template <typename T> class IComparable_1 {};
 class IComparable {};
-class ValueType {};
+class ValueType : public Object {};
 template <typename T> class IEquatable_1 {};
 class IDisposable {
 public:
@@ -147,7 +147,13 @@ template <typename A, typename B, typename C> C op_Multiply(A x, B y) {
 }
 // std::string ToString(int x) { return std::string(""); }
 std::string ToString(int x) { return std::to_string(x); }
-template <typename T> std::string ToString(T x) { return x->ToString(); }
+template <typename T> std::string ToString(T x) { 
+  if constexpr (std::is_pointer_v<T>) {
+    return x->ToString(); 
+  } else {
+    return x.ToString();
+  }
+}
 template <typename T> std::string ToString(Gc<T> x) { return x->ToString(); }
 } // namespace Operators
 } // namespace Core

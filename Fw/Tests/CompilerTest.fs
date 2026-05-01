@@ -163,27 +163,31 @@ System.Console.WriteLine(string n)
     xunit.WriteLine $"{sourceCode}\n{code}\n=========="
 
   [<Fact>]
-  let ``idisposable smoke test`` () =
+  let ``idisposable smoke tests`` () =
     let src =
       "
 type Foo() =
   interface System.IDisposable with
     member this.Dispose() =
       System.Console.WriteLine(\"Disposing...\")
-//type [<Struct>] FooStruct() =
-  //interface System.IDisposable with
-    //member this.Dispose() = ()
+type [<Struct>] FooStruct(n: int) =
+  interface System.IDisposable with
+    member this.Dispose() =
+      System.Console.WriteLine(\"Disposing struct...\")
 let main () =
   use f = new Foo()
-  //use fs = new FooStruct()
+  use fs = new FooStruct(1)
   System.Console.WriteLine(string f)
-  //System.Console.WriteLine(string fs)
+  System.Console.WriteLine(string fs)
   0
 main ()
   "
 
     let result = compileAndRunCode "idisposable" src
-    let expected = "System.Object\nDisposing...\n"
+
+    let expected =
+      "System.Object\nSystem.Object\nDisposing struct...\nDisposing...\n"
+
     xunit.WriteLine result.code
     Assert.Equal(expected, result.output)
 
