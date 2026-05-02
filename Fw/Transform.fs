@@ -200,7 +200,12 @@ let rec translate (e: FSharpExpr) : CppExpr =
       CallGen(
         Var "GcRoot",
         [ Var(ctor + "*") ],
-        [ Call(Var $"new {ctor}", List.map translate args) ]
+        [
+          Call(
+            Var $"new (UseGC) {ctor}",
+            List.map translate args
+          )
+        ]
       )
   | P.Let((mfv, value, dbg), body) ->
     let var = Let(mfv.CompiledName, translate value)

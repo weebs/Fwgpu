@@ -1,17 +1,42 @@
+#define GC_THREADS
+
 #include <any>
 #include <iostream>
 // #include <memory>
 #include <string>
 #include <type_traits>
+
+// clang-format off
+#include <gc/gc_cpp.h>
+#include <gc/gc_allocator.h>
+// clang-format on
+
 static std::ios_base::Init stream_initializer;
-// template <typename T> using Gc = std::shared_ptr<T>;
+
+struct SetupBoehmGC {
+  public:
+    SetupBoehmGC() {
+      GC_INIT();
+    }
+    ~SetupBoehmGC() {
+      GC_gcollect();
+    }
+};
+SetupBoehmGC __setupBoehmGc;
+
 template <typename T> using Gc = T *;
+// template <typename T> using Gc = std::shared_ptr<T>;
+std::vector<void **> objectRoots;
 template <typename T> class GcRoot {
 public:
-  T data;
-  GcRoot(T object) : data(object) {}
+  volatile T data;
+  GcRoot(T object) : data(object) { objectRoots.push_back((void **)&data); }
+  ~GcRoot() { objectRoots.pop_back(); }
   T operator->() { return data; }
   operator T() { return data; }
+  static void push(void **address) { objectRoots.push_back(address); }
+  GcRoot(const GcRoot &) = delete;
+  GcRoot &operator=(const GcRoot &) = delete;
 };
 namespace System {
 class Object {
@@ -68,7 +93,7 @@ class IComparer {};
 class IEqualityComparer {};
 namespace Generic {
 template <typename T> class List_1 : IEnumerable_1<T> {
-  std::vector<T> items;
+  std::vector<T, gc_allocator<T>> items;
 
 public:
   class Enumerator : public IEnumerator_1<T> {
@@ -147,9 +172,9 @@ template <typename A, typename B, typename C> C op_Multiply(A x, B y) {
 }
 // std::string ToString(int x) { return std::string(""); }
 std::string ToString(int x) { return std::to_string(x); }
-template <typename T> std::string ToString(T x) { 
+template <typename T> std::string ToString(T x) {
   if constexpr (std::is_pointer_v<T>) {
-    return x->ToString(); 
+    return x->ToString();
   } else {
     return x.ToString();
   }

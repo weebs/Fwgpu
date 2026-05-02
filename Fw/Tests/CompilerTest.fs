@@ -36,7 +36,18 @@ let compileAndRunCode (testName: string) (src: string) =
     // .WithArguments([ outPath; "-o"; o ])
     .Wrap("zig")
     .WithArguments(
-      [ "c++"; "-std=c++17"; "-g"; outPath; "-o"; o ]
+      [
+        "c++"
+        "-std=c++17"
+        "-I/opt/homebrew/include"
+        "-L/opt/homebrew/lib"
+        "-lgccpp"
+        "-lgc"
+        "-g"
+        outPath
+        "-o"
+        o
+      ]
     )
     .ExecuteAsync()
     .Task.Result
@@ -137,9 +148,14 @@ type AdderWithN(n: int) =
 type Adder(n: int) =
   member this.Add (x, y) = x + y + n
   // member this.Add x y = x + y + n
-let adder = Adder(40)
-let result = adder.Add(1, 1)
-System.Console.WriteLine result
+
+let main () =
+  let adder = Adder(40)
+  let result = adder.Add(1, 1)
+  System.Console.WriteLine result
+
+for i in 1..10000 do
+  main ()
   "
 
     let result = compileAndRunCode "basic_class" sourceCode
