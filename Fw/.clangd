@@ -1,4 +1,16 @@
 CompileFlags:
-    Add:
-      - -std=c++17
-      - -I/opt/homebrew/include
+  Add: [
+    "-std=c++26",
+    #"-I/Users/sbeew/.gcc/include/c++/17.0.0",
+    #"-I/Users/sbeew/.gcc/include",
+    "-nostdinc++",
+    "-fexpansion-statements",
+    "-isystem", "/usr/local/include",
+    "-isystem", "/Library/Developer/CommandLineTools/usr/include",
+    "-freflection", # Required for P2996 reflection support
+    "-Xclang", "-freflection", # Some HEAD versions require the Xclang prefix
+    "-I/Users/sbeew/repos/clang-p2996/build/include/c++/v1",
+    "-I/opt/homebrew/include",
+    "--driver-mode=g++"
+  ]
+  QueryDriver: ["/Users/sbeew/repos/clang-p2996/build/bin/clang*"]

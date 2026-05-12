@@ -5,6 +5,8 @@
 // #include <memory>
 #include <string>
 #include <type_traits>
+#include <vector>
+#include <functional>
 
 // clang-format off
 #include <gc/gc_cpp.h>
@@ -14,13 +16,9 @@
 static std::ios_base::Init stream_initializer;
 
 struct SetupBoehmGC {
-  public:
-    SetupBoehmGC() {
-      GC_INIT();
-    }
-    ~SetupBoehmGC() {
-      GC_gcollect();
-    }
+public:
+  SetupBoehmGC() { GC_INIT(); }
+  ~SetupBoehmGC() { GC_gcollect(); }
 };
 SetupBoehmGC __setupBoehmGc;
 
@@ -129,6 +127,18 @@ void WriteLine(int n) { std::cout << n << std::endl; }
 } // namespace System
 namespace Microsoft {
 namespace FSharp {
+namespace Collections {
+// template <typename T> class ResizeArray_1 {};
+template <typename T>
+using ResizeArray_1 = System::Collections::Generic::List_1<T>;
+template <typename T> class list_1 {};
+template <typename T> class seq_1 {};
+namespace SeqModule {
+template <typename T> list_1<T>* ToList(seq_1<T>* xs);
+template <typename T, typename U> seq_1<U>* Map(std::function<U(T)> fn, seq_1<T>* xs);
+template <typename T> seq_1<T>* Delay(std::function<seq_1<T>*()> toDelay);
+} // namespace SeqModule
+} // namespace Collections
 namespace Core {
 namespace LanguagePrimitives {
 Gc<System::Collections::IComparer> GenericComparer;
@@ -167,25 +177,29 @@ template <typename T> T op_RightShift(T x, int n) { return x >> n; }
 template <typename A, typename B, typename C> C op_Addition(A x, B y) {
   return x + y;
 }
+template <typename A, typename B> bool op_LessThan(A x, B y) { return x < y;}
 template <typename A, typename B, typename C> C op_Multiply(A x, B y) {
   return x * y;
 }
+template <typename T> Collections::seq_1<T>* op_Range(T start, T end);
+template <typename T> Collections::seq_1<T>* CreateSequence(Collections::seq_1<T>* xs) { return xs; }
 // std::string ToString(int x) { return std::string(""); }
 std::string ToString(int x) { return std::to_string(x); }
 template <typename T> std::string ToString(T x) {
   if constexpr (std::is_pointer_v<T>) {
     return x->ToString();
-  } else {
+    
+  } 
+  else if constexpr (std::is_arithmetic_v<T>) {
+    // For int, double, float, etc.
+    return std::to_string(x);
+  }
+  else {
     return x.ToString();
   }
 }
 template <typename T> std::string ToString(Gc<T> x) { return x->ToString(); }
 } // namespace Operators
 } // namespace Core
-namespace Collections {
-// template <typename T> class ResizeArray_1 {};
-template <typename T>
-using ResizeArray_1 = System::Collections::Generic::List_1<T>;
-} // namespace Collections
 } // namespace FSharp
 } // namespace Microsoft

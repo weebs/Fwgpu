@@ -285,12 +285,7 @@ type CppCompiler() =
     // We represent init actions with static objects with a constructor and
     // then create a default variable afterwards
     Ast.Sequence [
-      Ast.Struct {
-        name = tag
-        inherits = []
-        decls = [ Ast.Constructor(tag, [], Some body) ]
-      }
-      Ast.Variable(tag, Ast.Named tag, None)
+      Ast.Variable(tag, Ast.Auto, Some (Ast.Call(Ast.Lambda([], body @ [ Ast.Return (Ast.Var "0") ], []), [])))
     ]
 
   member private this.ProcessMfv mfv curriedArgs body =

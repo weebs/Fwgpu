@@ -7,15 +7,14 @@ open FSharp.Compiler.Symbols
 open FSharp.Compiler.Text
 open System.Collections.Generic
 open Compiler
+open FSharp.Data.LiteralProviders
 
 
-let sourceCode = "
-let a = 40
-let b = 2
-let c = a + b
-"
+let sourceCode = File.ReadAllText TextFile.``foo.fsx``.Path
 
 let cc = CppCompiler()
-let code = cc.Compile sourceCode
-let output = Path.Join(__SOURCE_DIRECTORY__, "cpp/foo.cpp")
-File.WriteAllText(output, code)
+let result =
+    Tests.Compiler.compileAndRunCode "foo" sourceCode
+printfn $"{result.output}"
+// let output = Path.Join(__SOURCE_DIRECTORY__, "cpp/foo.cpp")
+// File.WriteAllText(output, "#include \"../standard_library.cpp\"\n" + code)

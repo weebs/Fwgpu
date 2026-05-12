@@ -39,6 +39,7 @@ let compileAndRunCode (testName: string) (src: string) =
       [
         "c++"
         "-std=c++17"
+        // todo: pkg-config
         "-I/opt/homebrew/include"
         "-L/opt/homebrew/lib"
         "-lgccpp"
@@ -244,4 +245,43 @@ System.Console.WriteLine(f.Add(2))"
   let ``id works`` () =
     let result = compileAndRunCode "id_works" "let id x = x"
 
+    xunit.WriteLine result.code
+
+  [<Fact>]
+  let ``list builder`` () =
+    let src =
+      "
+let xs = [
+  for i in 1..10 do
+    i * 2
+]
+"
+
+    let result = compileAndRunCode "list_builder" src
+    xunit.WriteLine result.code
+
+  [<Fact>]
+  let ``object expression`` () =
+    let src =
+      "
+let main () =
+  use foo = { new System.IDisposable with member this.Dispose() = System.Console.WriteLine(\"Disposing...\")}
+  System.Console.WriteLine(foo)
+main ()
+"
+
+    let result = compileAndRunCode "object_expression" src
+    xunit.WriteLine result.code
+
+  [<Fact>]
+  let ``recursive lambda `` () =
+    let src =
+      "
+let main () =
+  let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2)
+  fib 7
+main ()
+"
+
+    let result = compileAndRunCode "recursive_lambda" src
     xunit.WriteLine result.code
