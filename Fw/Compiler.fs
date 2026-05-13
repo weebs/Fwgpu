@@ -278,19 +278,21 @@ type CppCompiler() =
             match r.StartColumn with
             | 0 -> $"__{r.StartLine}"
             | c -> $"__{r.StartLine}_{c}"
+        
         // We represent init actions with static IIFE lambdas
-        Ast.Sequence [
-            Ast.Variable(
-                tag,
-                Ast.Auto,
-                Some(
-                    Ast.Call(
-                        Ast.Lambda([], body @ [ Ast.Return(Ast.Var "0") ], []),
-                        []
-                    )
-                )
-            )
-        ]
+        Ast.INIT body
+        // Ast.Sequence [
+        //     Ast.Variable(
+        //         tag,
+        //         Ast.Auto,
+        //         Some(
+        //             Ast.Call(
+        //                 Ast.Lambda([], body @ [ Ast.Return(Ast.Var "0") ], []),
+        //                 []
+        //             )
+        //         )
+        //     )
+        // ]
 
     member private this.ProcessMfv mfv curriedArgs body =
         let stmts =

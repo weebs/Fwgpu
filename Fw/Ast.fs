@@ -44,6 +44,7 @@ type CppDecl =
     value: CppExpr option
   /// Synthetic: Helper so functions can return multiple declarations
   | Sequence of CppDecl list
+  | INIT of CppStmt list
 
 type CppExpr =
   | Var of string
@@ -258,6 +259,8 @@ public:
 
 let rec printDecl (decl: CppDecl) =
   match decl with
+  | INIT body ->
+      $"DO;{shadowVariables [] body |> printBody} END;"
   | Comment s -> $"/* {s} */"
   | Variable(name, ty, None) -> $"{printType ty} {name};"
   | Variable(name, ty, Some value) ->

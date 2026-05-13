@@ -1,3 +1,12 @@
+#ifndef INITMACRO
+#define INITMACRO
+#define CONCAT_HIDDEN(a, b) a ## b
+#define CONCAT(a, b) CONCAT_HIDDEN(a, b)
+#define INIT(body) auto CONCAT(__, __COUNTER__) = [] { body; return 0; }();
+#define DO auto CONCAT(__, __COUNTER__) = [] {
+#define END return 0; }();
+#endif
+
 #include <concepts>
 #define GC_THREADS
 
