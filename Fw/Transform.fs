@@ -35,7 +35,7 @@ let replaceIncludedBCLNamespaces (path: string) =
         .Replace("Microsoft::FSharp::Core::LanguagePrimitives::IntrinsicFunctions", "")
         .Replace("Microsoft::FSharp::Core::LanguagePrimitives", "")
         .Replace("Microsoft::FSharp::Collections", "")
-        .Replace("System::Collections::Generic::List_1", "::ResizeArray_1")
+        // .Replace("System::Collections::Generic::List_1", "::ResizeArray_1")
     
 let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
     let path =
