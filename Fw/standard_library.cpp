@@ -15,191 +15,357 @@
 
 static std::ios_base::Init stream_initializer;
 
-struct SetupBoehmGC {
+struct SetupBoehmGC
+{
 public:
-  SetupBoehmGC() { GC_INIT(); }
-  ~SetupBoehmGC() { GC_gcollect(); }
+    SetupBoehmGC() { GC_INIT(); }
+    ~SetupBoehmGC() { GC_gcollect(); }
 };
+
 SetupBoehmGC __setupBoehmGc;
 
-template <typename T> using Gc = T *;
+template <typename T>
+using Gc = T*;
 // template <typename T> using Gc = std::shared_ptr<T>;
-std::vector<void **> objectRoots;
-template <typename T> class GcRoot {
-public:
-  volatile T data;
-  GcRoot(T object) : data(object) { objectRoots.push_back((void **)&data); }
-  ~GcRoot() { objectRoots.pop_back(); }
-  T operator->() { return data; }
-  operator T() { return data; }
-  static void push(void **address) { objectRoots.push_back(address); }
-  GcRoot(const GcRoot &) = delete;
-  GcRoot &operator=(const GcRoot &) = delete;
-};
-namespace System {
-class Object {
-  //   std::string type;
+std::vector<void**> objectRoots;
 
+template <typename T>
+class GcRoot
+{
 public:
-  virtual ~Object() = default;
-  //   bool IsType(std::string typeName) { return type == typeName; }
-  virtual std::string ToString() { return "System.Object"; }
+    volatile T data;
+    GcRoot(T object) : data(object) { objectRoots.push_back((void**)&data); }
+    ~GcRoot() { objectRoots.pop_back(); }
+    T operator->() { return data; }
+    operator T() { return data; }
+    static void push(void** address) { objectRoots.push_back(address); }
+    GcRoot(const GcRoot&) = delete;
+    GcRoot& operator=(const GcRoot&) = delete;
+};
 
-public:
-  // void *__data; // TODO : deleting in the destructor
-  std::any __data;
-};
-template <typename T> bool IsType(Gc<System::Object> obj) {
-  if constexpr (std::is_pointer_v<T>) {
-    return dynamic_cast<T>(obj) != nullptr;
-  } else {
-    return obj->__data.type() == typeid(T);
-  }
-}
-template <typename T> class IComparable_1 {};
-class IComparable {};
-class ValueType : public Object {};
-template <typename T> class IEquatable_1 {};
-class IDisposable {
-public:
-  virtual ~IDisposable() = default;
-  void Dispose() { this->System_IDisposable_Dispose(); }
-  virtual void System_IDisposable_Dispose() {};
-};
-namespace Collections {
-class IEnumerator : public IDisposable {
-public:
-  virtual IEnumerator GetEnumerator() = 0;
-};
-template <typename T> class IEnumerator_1 : public IDisposable {
-public:
-  IEnumerator_1<T> *GetEnumerator();
-  bool MoveNext() { return this->System_Collections_IEnumerator_1_MoveNext(); }
-  T get_Current() {
-    return this->System_Collections_IEnumerator_1_get_Current();
-  }
-  void Reset() { this->System_Collections_IEnumerator_1_Reset(); }
-  virtual bool System_Collections_IEnumerator_1_MoveNext() = 0;
-  virtual T System_Collections_IEnumerator_1_get_Current() = 0;
-  virtual void System_Collections_IEnumerator_1_Reset() = 0;
-};
-class IEnumerable {};
-template <typename T> class IEnumerable_1 : public IEnumerable {};
-class IStructuralEquatable {};
-class IStructuralComparable {};
-class IComparer {};
-class IEqualityComparer {};
-namespace Generic {
-template <typename T> class List_1 : IEnumerable_1<T> {
-  std::vector<T, gc_allocator<T>> items;
+namespace System
+{
+    class Object
+    {
+        //   std::string type;
 
-public:
-  class Enumerator : public IEnumerator_1<T> {
-    int index = 0;
-    T current;
-    List_1<T> *list;
+    public:
+        virtual ~Object() = default;
+        //   bool IsType(std::string typeName) { return type == typeName; }
+        virtual std::string ToString() { return "System.Object"; }
 
-  public:
-    Enumerator(List_1<T> *xs) : list(xs) {}
-    bool System_Collections_IEnumerator_1_MoveNext() override {
-      if (index < list->items.size()) {
-        current = list->items[index];
-        index++;
-        return true;
-      }
-      index = -1;
-      return false;
+    public:
+        // void *__data; // TODO : deleting in the destructor
+        std::any __data;
+    };
+
+    template <typename T>
+    bool IsType(Gc<System::Object> obj)
+    {
+        if constexpr (std::is_pointer_v<T>)
+        {
+            return dynamic_cast<T>(obj) != nullptr;
+        }
+        else
+        {
+            return obj->__data.type() == typeid(T);
+        }
     }
-    T System_Collections_IEnumerator_1_get_Current() override {
-      return current;
-    }
-    void System_Collections_IEnumerator_1_Reset() override { index = 0; }
-  };
-  void Add(T value) { items.push_back(value); }
-  List_1::Enumerator GetEnumerator() { return Enumerator(this); }
-};
-} // namespace Generic
-} // namespace Collections
-namespace Console {
-void WriteLine(std::string s) { std::cout << s << std::endl; }
-void WriteLine(int n) { std::cout << n << std::endl; }
-} // namespace Console
-} // namespace System
-namespace Microsoft {
-namespace FSharp {
-namespace Collections {
-// template <typename T> class ResizeArray_1 {};
-template <typename T>
-using ResizeArray_1 = System::Collections::Generic::List_1<T>;
-template <typename T> class list_1 {};
-template <typename T> class seq_1 {};
-namespace SeqModule {
-template <typename T> list_1<T>* ToList(seq_1<T>* xs);
-template <typename T, typename U> seq_1<U>* Map(std::function<U(T)> fn, seq_1<T>* xs);
-template <typename T> seq_1<T>* Delay(std::function<seq_1<T>*()> toDelay);
-} // namespace SeqModule
-} // namespace Collections
-namespace Core {
-namespace LanguagePrimitives {
-Gc<System::Collections::IComparer> GenericComparer;
-Gc<System::Collections::IEqualityComparer> GenericEqualityComparer;
-template <typename T> bool GenericEqualityER(T a, T b) { return a == b; }
-template <typename T>
-bool GenericEqualityWithComparer(Gc<System::Collections::IEqualityComparer>,
-                                 T a, T b) {
-  return false;
-}
-template <typename T>
-int GenericComparisonWithComparer(Gc<System::Collections::IComparer> comp, T a,
-                                  T b) {
-  return 0;
-}
-template <typename T>
-int GenericHashWithComparer(Gc<System::Collections::IEqualityComparer> comp,
-                            T a) {
-  return 0;
-}
-namespace IntrinsicFunctions {
-template <typename T> T UnboxGeneric(Gc<System::Object> obj) {
-  // return std::dynamic_pointer_cast<typename T::element_type>(obj);
-  if constexpr (std::is_pointer_v<T>) {
-    return dynamic_cast<T>(obj);
-  } else {
-    return std::any_cast<T>(obj->__data);
-  }
-}
-} // namespace IntrinsicFunctions
-} // namespace LanguagePrimitives
-namespace Operators {
-// int op_Addition(int x, int y) { return x + y; }
-template <typename T> T op_LeftShift(T x, int n) { return x << n; }
-template <typename T> T op_RightShift(T x, int n) { return x >> n; }
-template <typename A, typename B, typename C> C op_Addition(A x, B y) {
-  return x + y;
-}
-template <typename A, typename B> bool op_LessThan(A x, B y) { return x < y;}
-template <typename A, typename B, typename C> C op_Multiply(A x, B y) {
-  return x * y;
-}
-template <typename T> Collections::seq_1<T>* op_Range(T start, T end);
-template <typename T> Collections::seq_1<T>* CreateSequence(Collections::seq_1<T>* xs) { return xs; }
-// std::string ToString(int x) { return std::string(""); }
-std::string ToString(int x) { return std::to_string(x); }
-template <typename T> std::string ToString(T x) {
-  if constexpr (std::is_pointer_v<T>) {
-    return x->ToString();
     
-  } 
-  else if constexpr (std::is_arithmetic_v<T>) {
-    // For int, double, float, etc.
-    return std::to_string(x);
-  }
-  else {
-    return x.ToString();
-  }
-}
-template <typename T> std::string ToString(Gc<T> x) { return x->ToString(); }
-} // namespace Operators
-} // namespace Core
-} // namespace FSharp
+    class String : public Object
+    {
+    public:
+        char* data;
+        String() : data(nullptr) {}
+        String(const char* chars)
+        {
+            auto length = strlen(chars) + 1;
+            data = (char*)GC_malloc_atomic(length);
+            memcpy(data, chars, length);
+        }
+        
+        bool operator==(const String& other) const
+        {
+            auto lenA = strlen(data);
+            auto lenB = strlen(other.data);
+            if (lenA != lenB) return false;
+            for (int i = 0; i < lenA; i++)
+            {
+                if (data[i] != other.data[i]) return false;
+            }
+            return true;
+        }
+    };
+
+    template <typename T>
+    class IComparable_1
+    {
+    };
+
+    class IComparable
+    {
+    };
+
+    class ValueType : public Object
+    {
+    };
+
+    template <typename T>
+    class IEquatable_1
+    {
+    };
+
+    class IDisposable
+    {
+    public:
+        virtual ~IDisposable() = default;
+        void Dispose() { this->System_IDisposable_Dispose(); }
+
+        virtual void System_IDisposable_Dispose()
+        {
+        };
+    };
+
+    namespace Collections
+    {
+        class IEnumerator : public IDisposable
+        {
+        public:
+            virtual IEnumerator GetEnumerator() = 0;
+        };
+
+        template <typename T>
+        class IEnumerator_1 : public IDisposable
+        {
+        public:
+            IEnumerator_1<T>* GetEnumerator();
+            bool MoveNext() { return this->System_Collections_IEnumerator_1_MoveNext(); }
+
+            T get_Current()
+            {
+                return this->System_Collections_IEnumerator_1_get_Current();
+            }
+
+            void Reset() { this->System_Collections_IEnumerator_1_Reset(); }
+            virtual bool System_Collections_IEnumerator_1_MoveNext() = 0;
+            virtual T System_Collections_IEnumerator_1_get_Current() = 0;
+            virtual void System_Collections_IEnumerator_1_Reset() = 0;
+        };
+
+        class IEnumerable
+        {
+        };
+
+        template <typename T>
+        class IEnumerable_1 : public IEnumerable
+        {
+        };
+
+        class IStructuralEquatable
+        {
+        };
+
+        class IStructuralComparable
+        {
+        };
+
+        class IComparer
+        {
+        };
+
+        class IEqualityComparer
+        {
+        };
+
+        namespace Generic
+        {
+            template <typename T>
+            class List_1 : IEnumerable_1<T>
+            {
+                std::vector<T, gc_allocator<T>> items;
+
+            public:
+                class Enumerator : public IEnumerator_1<T>
+                {
+                    int index = 0;
+                    T current;
+                    List_1<T>* list;
+
+                public:
+                    Enumerator(List_1<T>* xs) : list(xs)
+                    {
+                    }
+
+                    bool System_Collections_IEnumerator_1_MoveNext() override
+                    {
+                        if (index < list->items.size())
+                        {
+                            current = list->items[index];
+                            index++;
+                            return true;
+                        }
+                        index = -1;
+                        return false;
+                    }
+
+                    T System_Collections_IEnumerator_1_get_Current() override
+                    {
+                        return current;
+                    }
+
+                    void System_Collections_IEnumerator_1_Reset() override { index = 0; }
+                };
+
+                void Add(T value) { items.push_back(value); }
+                List_1::Enumerator GetEnumerator() { return Enumerator(this); }
+            };
+        } // namespace Generic
+    } // namespace Collections
+    namespace Console
+    {
+        void WriteLine(const System::String& s) { std::cout << s.data << std::endl; }
+        void WriteLine(std::string s) { std::cout << s << std::endl; }
+        void WriteLine(int n) { std::cout << n << std::endl; }
+    } // namespace Console
+} // namespace System
+namespace Microsoft
+{
+    namespace FSharp
+    {
+        namespace Collections
+        {
+            // template <typename T> class ResizeArray_1 {};
+            template <typename T>
+            using ResizeArray_1 = System::Collections::Generic::List_1<T>;
+
+            template <typename T>
+            class list_1
+            {
+            };
+
+            template <typename T>
+            class seq_1
+            {
+            };
+
+            namespace SeqModule
+            {
+                template <typename T>
+                list_1<T>* ToList(seq_1<T>* xs);
+                template <typename T, typename U>
+                seq_1<U>* Map(std::function<U(T)> fn, seq_1<T>* xs);
+                template <typename T>
+                seq_1<T>* Delay(std::function<seq_1<T>*()> toDelay);
+            } // namespace SeqModule
+        } // namespace Collections
+        namespace Core
+        {
+            namespace LanguagePrimitives
+            {
+                Gc<System::Collections::IComparer> GenericComparer;
+                Gc<System::Collections::IEqualityComparer> GenericEqualityComparer;
+
+                template <typename T>
+                bool GenericEqualityER(T a, T b) { return a == b; }
+
+                template <typename T>
+                bool GenericEqualityWithComparer(Gc<System::Collections::IEqualityComparer>,
+                                                 T a, T b)
+                {
+                    return false;
+                }
+
+                template <typename T>
+                int GenericComparisonWithComparer(Gc<System::Collections::IComparer> comp, T a,
+                                                  T b)
+                {
+                    return 0;
+                }
+
+                template <typename T>
+                int GenericHashWithComparer(Gc<System::Collections::IEqualityComparer> comp,
+                                            T a)
+                {
+                    return 0;
+                }
+
+                namespace IntrinsicFunctions
+                {
+                    template <typename T>
+                    T UnboxGeneric(Gc<System::Object> obj)
+                    {
+                        // return std::dynamic_pointer_cast<typename T::element_type>(obj);
+                        if constexpr (std::is_pointer_v<T>)
+                        {
+                            return dynamic_cast<T>(obj);
+                        }
+                        else
+                        {
+                            return std::any_cast<T>(obj->__data);
+                        }
+                    }
+                } // namespace IntrinsicFunctions
+            } // namespace LanguagePrimitives
+            namespace Operators
+            {
+                // int op_Addition(int x, int y) { return x + y; }
+                template <typename T>
+                T op_LeftShift(T x, int n) { return x << n; }
+
+                template <typename T>
+                T op_RightShift(T x, int n) { return x >> n; }
+
+                template <typename A, typename B, typename C>
+                C op_Addition(A x, B y)
+                {
+                    return x + y;
+                }
+
+                template <typename A, typename B, typename C>
+                C op_Multiply(A x, B y)
+                {
+                    return x * y;
+                }
+
+                template <typename T>
+                Collections::seq_1<T>* op_Range(T start, T end);
+
+                template <typename A, typename B>
+                bool op_Inequality(A a, B b) { return a == b; }
+
+                template <typename A, typename B>
+                bool op_LessThan(A x, B y) { return x < y; }
+                
+                template <typename A, typename B>
+                bool op_GreaterThan(A x, B y) { return x > y; }
+
+                template <typename T>
+                Collections::seq_1<T>* CreateSequence(Collections::seq_1<T>* xs) { return xs; }
+
+                // std::string ToString(int x) { return std::string(""); }
+                std::string ToString(int x) { return std::to_string(x); }
+
+                template <typename T>
+                std::string ToString(T x)
+                {
+                    if constexpr (std::is_pointer_v<T>)
+                    {
+                        return x->ToString();
+                    }
+                    else if constexpr (std::is_arithmetic_v<T>)
+                    {
+                        // For int, double, float, etc.
+                        return std::to_string(x);
+                    }
+                    else
+                    {
+                        return x.ToString();
+                    }
+                }
+
+                template <typename T>
+                std::string ToString(Gc<T> x) { return x->ToString(); }
+            } // namespace Operators
+        } // namespace Core
+    } // namespace FSharp
 } // namespace Microsoft

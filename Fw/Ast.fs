@@ -60,6 +60,7 @@ type CppExpr =
   | ExprComment of string
   | GetField of src: CppExpr * field: string
   | DerefGetField of src: CppExpr * field: string
+  | ObjectInitializer of ty: CppTy * record: (string * CppExpr) list
 
   static let sourceMappings =
     System.Runtime.CompilerServices.ConditionalWeakTable<
@@ -114,7 +115,7 @@ and CppStmt =
 let rec print (e: CppExpr) =
   match e with
   | Var s -> s
-  | Const(o, ``type``) -> $"%A{o}"
+  | Const(o, ty) -> $"%A{o}"
   | Call(callee, args) ->
     let txtArgs =
       args |> List.map print |> String.concat ", "
@@ -136,10 +137,20 @@ let rec print (e: CppExpr) =
 
     let txtBody = printBody body
     let txtCaptures = String.concat ", " captures
-    $"[{txtCaptures}]({txtArgs}){{{txtBody}}}"
+    if txtArgs = "" then
+        $"[{txtCaptures}]{{{txtBody}}}"
+    else
+        $"[{txtCaptures}]({txtArgs}){{{txtBody}}}"
   | GetField(src, field) -> $"{print src}.{field}"
   | DerefGetField(src, field) -> $"{print src}->{field}"
   | ExprComment c -> $"/* {c} */"
+  | ObjectInitializer (ty, fields) ->
+      let txtFields =
+          fields
+          |> List.map (fun (name, value) -> $".{name} = {print value}")
+          |> String.concat ", "
+      $"{printType ty} {{ {txtFields} }}"
+      
 
 and printStmt (s: CppStmt) =
   match s with
@@ -185,9 +196,9 @@ let private addReturn' (s: CppStmt) =
   | SVariable _
   | SComment _ -> s
   | Exp cppExpr -> Return cppExpr
-  | Let(name, value) -> s
-  | Return cppExpr -> s
-  | Assign(dest, value) -> s
+  | Let _ -> s
+  | Return _ -> s
+  | Assign _ -> s
   | IfThenElse(cond, wt, wf) ->
     IfThenElse(cond, addReturn wt, addReturn wf)
   | TryCatch(tryBody, args, catchBody) ->

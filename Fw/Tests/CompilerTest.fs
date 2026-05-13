@@ -285,3 +285,20 @@ main ()
 
     let result = compileAndRunCode "recursive_lambda" src
     xunit.WriteLine result.code
+    
+  [<Fact>]
+  let ``basic records`` () =
+    let src =
+      "
+type Foo = { a: int; b: string }
+type Bar = { b: bool; foo: Foo }
+let main () =
+    let foo = { a = 1; b = \"hi\" }
+    let bar = { b = true; foo = foo }
+    let baz = { bar with foo.a = 2 }
+    System.Console.WriteLine(foo.b)
+main ()
+"
+
+    let result = compileAndRunCode "basic_records" src
+    xunit.WriteLine result.output
