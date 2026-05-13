@@ -5,14 +5,6 @@ open FSharp.Compiler.Symbols
 
 module P = FSharpExprPatterns
 
-let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
-    match mfv.DeclaringEntity with
-    | Some ent ->
-        let cpp = entTypeName ent
-        let path = cpp + "::" + mfv.CompiledName
-        path
-    | None -> failwith "Empty declaring entity for module variable"
-
 let isUnit (t: FSharpType) =
     try
         if t.IsGenericParameter then
@@ -31,6 +23,29 @@ let fieldName (field: FSharpField) = field.Name
 
 let toCppPath (s: string) =
     s.Replace("+", "::").Replace(".", "::").Replace("`", "_")
+    |> replaceIncludedBCLNamespaces
+    
+let replaceIncludedBCLNamespaces (path: string) =
+    path
+        // .Replace("Microsoft::FSharp::Core::Operators::", "")
+        // .Replace("Microsoft::FSharp::Core::LanguagePrimitives::IntrinsicFunctions::", "")
+        // .Replace("Microsoft::FSharp::Core::LanguagePrimitives::", "")
+        // .Replace("Microsoft::FSharp::Collections::", "")
+        .Replace("Microsoft::FSharp::Core::Operators", "")
+        .Replace("Microsoft::FSharp::Core::LanguagePrimitives::IntrinsicFunctions", "")
+        .Replace("Microsoft::FSharp::Core::LanguagePrimitives", "")
+        .Replace("Microsoft::FSharp::Collections", "")
+        .Replace("System::Collections::Generic::List_1", "::ResizeArray_1")
+    
+let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
+    let path =
+        match mfv.DeclaringEntity with
+        | Some ent ->
+            let cpp = entTypeName ent
+            let path = cpp + "::" + mfv.CompiledName
+            path
+        | None -> failwith "Empty declaring entity for module variable"
+    replaceIncludedBCLNamespaces path
 
 let typeName (t: FSharpType) =
     let baseTy =
@@ -51,8 +66,11 @@ let typeName (t: FSharpType) =
             |> String.concat ", "
 
         $"{baseTy}<{args}>"
+    |> replaceIncludedBCLNamespaces
 
-let entTypeName (ent: FSharpEntity) = ent.BasicQualifiedName |> toCppPath
+let entTypeName (ent: FSharpEntity) =
+    ent.BasicQualifiedName
+    |> toCppPath
 
 let rec translate (e: FSharpExpr) : CppExpr =
     match e with
@@ -119,7 +137,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
         else
             Lambda([ mfv.CompiledName ], stmts, [])
     | P.Value mfv when mfv.CompiledName = "bind@" -> Var "bind"
-    | P.Value mfv -> Var mfv.CompiledName
+    | P.Value mfv -> Var (mfv.CompiledName |> replaceIncludedBCLNamespaces)
     | P.ThisValue _ty -> Var "this"
     | P.FSharpFieldGet(Some expr, ty, field) ->
         // TODO : check if e.Type.TypeDefinition is a reference type
@@ -162,10 +180,13 @@ let rec translate (e: FSharpExpr) : CppExpr =
     | P.ILAsm(asm, _types, _values) ->
         match asm with
         | "[I_call\n   (Normalcall,\n    Microsoft.FSharp.Core.LanguagePrimitives::get_GenericComparer(...)(...),\n    None)]" ->
-            Var "Microsoft::FSharp::Core::LanguagePrimitives::GenericComparer"
+            "Microsoft::FSharp::Core::LanguagePrimitives::GenericComparer"
+            |> replaceIncludedBCLNamespaces
+            |> Var
         | "[I_call\n   (Normalcall,\n    Microsoft.FSharp.Core.LanguagePrimitives::get_GenericEqualityComparer(...)(...),\n    None)]" ->
-            Var
-                "Microsoft::FSharp::Core::LanguagePrimitives::GenericEqualityComparer"
+            "Microsoft::FSharp::Core::LanguagePrimitives::GenericEqualityComparer"
+            |> replaceIncludedBCLNamespaces
+            |> Var
         | _ -> ExprComment asm
     | P.DefaultValue t when requiresGc t -> Var "nullptr"
     | P.NewRecord(ty, values) when requiresGc ty ->

@@ -207,14 +207,28 @@ type CppCompiler() =
             | Some bt -> [ Transform.typeName bt ]
             | _ -> []
 
+        let recordCtor (entity: FSharpEntity) =
+            let args =
+                entity.FSharpFields
+                |> Seq.toList
+                |> List.map (fun f -> (f.Name, Transform.tyConvert f.FieldType))
+
+            Ast.Constructor(
+                entity.CompiledName,
+                args,
+                Some [
+                    for name, _ in args do
+                        Ast.Assign(
+                            Ast.DerefGetField(Ast.Var "this", name),
+                            Ast.Var name
+                        )
+                ]
+            )
+
         let decls = [
             yield! fields
             if entity.IsFSharpRecord then
-                let args = entity.FSharpFields |> Seq.toList |> List.map (fun f -> (f.Name, Transform.tyConvert f.FieldType))
-                Ast.Constructor(entity.CompiledName, args, Some [
-                    for name, _ in args do
-                        Ast.Assign (Ast.DerefGetField (Ast.Var "this", name), Ast.Var name)
-                ])
+                recordCtor entity
             yield! ctors
             yield! members
             yield! generated
