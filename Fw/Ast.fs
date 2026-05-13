@@ -260,7 +260,7 @@ public:
 let rec printDecl (decl: CppDecl) =
   match decl with
   | INIT body ->
-      $"DO;{shadowVariables [] body |> printBody} END;"
+      $"INIT;{shadowVariables [] body |> printBody} ENDINIT;"
   | Comment s -> $"/* {s} */"
   | Variable(name, ty, None) -> $"{printType ty} {name};"
   | Variable(name, ty, Some value) ->

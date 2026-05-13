@@ -21,9 +21,8 @@ static std::ios_base::Init __stream_initializer;
 #define INITMACRO
 #define CONCAT_HIDDEN(a, b) a ## b
 #define CONCAT(a, b) CONCAT_HIDDEN(a, b)
-#define INIT(body) auto CONCAT(__, __COUNTER__) = [] { body; return 0; }();
-#define DO auto CONCAT(__, __COUNTER__) = [] {
-#define END return 0; }();
+#define INIT auto CONCAT(__, __COUNTER__) = [] {
+#define ENDINIT return 0; }();
 #endif
 
 
