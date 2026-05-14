@@ -86,6 +86,14 @@ template <typename T> bool IsType(Gc<System::Object> obj) {
   }
 }
 
+template <typename T>
+class Box : public virtual Object {
+T data;
+public:
+  Box(T value) : data(value) {}
+  T* get() { return &data; }
+};
+
 class String : public Object {
 public:
   char *data;
