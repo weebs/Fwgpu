@@ -45,6 +45,7 @@ type CppDecl =
     value: CppExpr option
   /// Synthetic: Helper so functions can return multiple declarations
   | Sequence of CppDecl list
+  | Stmt of CppStmt
   | INIT of CppStmt list
 
 type CppExpr =
@@ -283,6 +284,7 @@ let rec printDecl (decl: CppDecl) =
     $"{tyName}({printArgs args});"
   | Function(name, signature, None) ->
     $"{printFsig name signature};"
+  | Stmt s -> printStmt s + ";"
   | Constructor(tyName, args, Some body) ->
     let names = args |> List.map fst
 
