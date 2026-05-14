@@ -97,13 +97,10 @@ let rec print (e: CppExpr) =
     | Const(o, ty) -> $"%A{o}"
     | Call(callee, args) ->
         let txtArgs = args |> List.map print |> String.concat ", "
-
         $"{print callee}({txtArgs})"
     | CallGen(callee, genArgs, args) ->
         let txtArgs = args |> List.map print |> String.concat ", "
-
         let txtGenArgs = genArgs |> List.map print |> String.concat ", "
-
         $"{print callee}<{txtGenArgs}>({txtArgs})"
     | Lambda(args, body, captures) ->
         let txtArgs =
@@ -251,17 +248,13 @@ let rec printDecl (decl: CppDecl) =
     | Stmt s -> printStmt s + ";"
     | Constructor(tyName, args, Some body) ->
         let names = args |> List.map fst
-
         let txtBody = shadowVariables names body |> printBody
-
         $"{tyName}({printArgs args}) {{ {txtBody} }}"
     | DeletedVirtual(name, signature) ->
         $"virtual {printFsig name signature} = 0;"
     | Function(name, signature, Some body) ->
         let names = signature.args |> List.map fst
-
         let txtBody = shadowVariables names body |> printBody
-
         $"{printFsig name signature} {{ {txtBody} }}"
 
 let rec shadowVariables
