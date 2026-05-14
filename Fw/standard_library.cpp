@@ -36,6 +36,9 @@ SetupBoehmGC __setupBoehmGc;
 
 template <typename T> using Gc = T *;
 
+template <typename From, typename To, typename T>
+To coerce(T& value) { return dynamic_cast<To>(static_cast<From>(value)); }
+
 namespace System {
 class Object;
 }
@@ -205,6 +208,7 @@ public:
 } // namespace Generic
 } // namespace Collections
 namespace Console {
+void WriteLine(const System::String *s) { std::cout << s->data << std::endl; }
 void WriteLine(const System::String &s) { std::cout << s.data << std::endl; }
 void WriteLine(const System::Object &o) { std::println("System.Object"); }
 void WriteLine(std::string s) { std::cout << s << std::endl; }
