@@ -35,10 +35,6 @@ let toCppPath (s: string) =
 
 let replaceIncludedBCLNamespaces (path: string) =
     path
-        // .Replace("Microsoft::FSharp::Core::Operators::", "")
-        // .Replace("Microsoft::FSharp::Core::LanguagePrimitives::IntrinsicFunctions::", "")
-        // .Replace("Microsoft::FSharp::Core::LanguagePrimitives::", "")
-        // .Replace("Microsoft::FSharp::Collections::", "")
         .Replace("Microsoft::FSharp::Core::Operators", "")
         .Replace(
             "Microsoft::FSharp::Core::LanguagePrimitives::IntrinsicFunctions",
@@ -46,7 +42,6 @@ let replaceIncludedBCLNamespaces (path: string) =
         )
         .Replace("Microsoft::FSharp::Core::LanguagePrimitives", "")
         .Replace("Microsoft::FSharp::Collections", "")
-// .Replace("System::Collections::Generic::List_1", "::ResizeArray_1")
 
 let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
     let path =
@@ -98,14 +93,15 @@ let translateCallArg (e: FSharpExpr) =
         Call(GetField(Call(Var "GcRoot", [ translate e ]), "get"), [])
     else
         translate e
-        
+
 let translateVar (mfv: FSharpMemberOrFunctionOrValue) body =
     let value = translate body
+
     if requiresGc mfv.FullType then
-        Call (Var "GcRoot", [ value ])
+        Call(Var "GcRoot", [ value ])
     else
         value
-        
+
 
 let rec translate (e: FSharpExpr) : CppExpr =
     match e with
@@ -221,36 +217,26 @@ let rec translate (e: FSharpExpr) : CppExpr =
         if not (requiresGc (mfv.DeclaringEntity.Value.AsType())) then
             Call(Var ctor, List.map translateCallArg args)
         else
-            Call(
-                Var $"gcnew {ctor}",
-                List.map translateCallArg args
-            )
+            Call(Var $"gcnew {ctor}", List.map translateCallArg args)
     | P.Let((mfv, value, _dbg), body) ->
-        let var =
-            Let(
-                (if mfv.CompiledName = "bind@" then
-                     "bind"
-                 else
-                     mfv.CompiledName),
-                translate value
-            )
-    
+        let name =
+            if mfv.CompiledName = "bind@" then
+                "bind"
+            else
+                mfv.CompiledName
+
+        let var = Let(name, translate value)
+
         let cppBody = var :: translateS body
         let withReturn = addReturn cppBody
         Call(Lambda([], withReturn, [ "&" ]), [])
     | P.ILAsm(asm, _types, _values) ->
-        match asm with
-        | "[I_call\n   (Normalcall,\n    Microsoft.FSharp.Core.LanguagePrimitives::get_GenericComparer(...)(...),\n    None)]" ->
-            "Microsoft::FSharp::Core::LanguagePrimitives::GenericComparer"
-            |> replaceIncludedBCLNamespaces
-            |> Var
-        | "[I_call\n   (Normalcall,\n    Microsoft.FSharp.Core.LanguagePrimitives::get_GenericEqualityComparer(...)(...),\n    None)]" ->
-            "Microsoft::FSharp::Core::LanguagePrimitives::GenericEqualityComparer"
-            |> replaceIncludedBCLNamespaces
-            |> Var
+        match replacements.TryGetValue asm with
+        | true, replacement -> Var(replaceIncludedBCLNamespaces replacement)
         | _ -> ExprComment asm
     | P.DefaultValue t when requiresGc t -> Var "nullptr"
     | P.NewRecord(ty, values) when requiresGc ty ->
+        // todo : hack
         let t = tyConvert ty |> printType |> _.Replace("*", "")
         Call(Var $"gcnew {t}", List.map translate values)
     | _ -> ExprComment $"%A{e}"
@@ -269,7 +255,8 @@ and translateS (e: FSharpExpr) : CppStmt list =
             yield! translateS body
         ]
     | P.Let((mfv, exp, _dbg), body) ->
-        SVariable (mfv.CompiledName, Auto, Some (translateVar mfv exp)) :: translateS body
+        SVariable(mfv.CompiledName, Auto, Some(translateVar mfv exp))
+        :: translateS body
     | P.ValueSet(mfv, value) -> [
         Assign(Var mfv.CompiledName, translate value)
       ]
@@ -325,25 +312,15 @@ and translateS (e: FSharpExpr) : CppStmt list =
     | P.DecisionTree(decision, targets) ->
         let desc = translateS decision
 
-        let tgts = [
+        let cppTargets = [
             for i in 0 .. targets.Length - 1 do
-                let args = fst targets[i]
-                let body = snd targets[i]
+                let args = fst targets[i] |> List.map _.FullName
+                let body = snd targets[i] |> translateS |> addReturn
 
-                SVariable(
-                    $"_{i}",
-                    Auto,
-                    Some(
-                        Lambda(
-                            args |> List.map _.FullName,
-                            translateS body |> addReturn,
-                            [ "&" ]
-                        )
-                    )
-                )
+                SVariable($"_{i}", Auto, Some(Lambda(args, body, [ "&" ])))
         ]
 
-        tgts @ desc
+        cppTargets @ desc
     | P.TryFinally(tryExpr, finallyExpr, _dbgTry, _dbgFinally) ->
         let tryBody = translateS tryExpr
         let finallyBody = translateS finallyExpr
@@ -437,4 +414,3 @@ let tyConvert (t: FSharpType) =
             elif isUnit t then Void
             else if requiresGc t then Named(typeName t + "*")
             else Named(typeName t)
-
