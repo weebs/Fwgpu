@@ -143,7 +143,12 @@ let rec print (e: CppExpr) =
     else
         $"[{txtCaptures}]({txtArgs}){{{txtBody}}}"
   | GetField(src, field) -> $"{print src}.{field}"
-  | DerefGetField(src, field) -> $"{print src}->{field}"
+  | DerefGetField(src, field) ->
+      let txtSrc = print src
+      if txtSrc.Contains " " then
+          $"({print src})->{field}"
+      else
+          $"{print src}->{field}"
   | ExprComment c -> $"/* {c} */"
   | ObjectInitializer (ty, fields) ->
       let txtFields =
