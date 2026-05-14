@@ -5,6 +5,14 @@ open FSharp.Compiler.Symbols
 
 module P = FSharpExprPatterns
 
+let replacements =
+    dict [
+        "[I_call\n   (Normalcall,\n    Microsoft.FSharp.Core.LanguagePrimitives::get_GenericComparer(...)(...),\n    None)]",
+        "Microsoft::FSharp::Core::LanguagePrimitives::GenericComparer"
+        "[I_call\n   (Normalcall,\n    Microsoft.FSharp.Core.LanguagePrimitives::get_GenericEqualityComparer(...)(...),\n    None)]",
+        "Microsoft::FSharp::Core::LanguagePrimitives::GenericEqualityComparer"
+    ]
+
 let isUnit (t: FSharpType) =
     try
         if t.IsGenericParameter then
@@ -24,7 +32,7 @@ let fieldName (field: FSharpField) = field.Name
 let toCppPath (s: string) =
     s.Replace("+", "::").Replace(".", "::").Replace("`", "_")
     |> replaceIncludedBCLNamespaces
-    
+
 let replaceIncludedBCLNamespaces (path: string) =
     path
         // .Replace("Microsoft::FSharp::Core::Operators::", "")
@@ -32,11 +40,14 @@ let replaceIncludedBCLNamespaces (path: string) =
         // .Replace("Microsoft::FSharp::Core::LanguagePrimitives::", "")
         // .Replace("Microsoft::FSharp::Collections::", "")
         .Replace("Microsoft::FSharp::Core::Operators", "")
-        .Replace("Microsoft::FSharp::Core::LanguagePrimitives::IntrinsicFunctions", "")
+        .Replace(
+            "Microsoft::FSharp::Core::LanguagePrimitives::IntrinsicFunctions",
+            ""
+        )
         .Replace("Microsoft::FSharp::Core::LanguagePrimitives", "")
         .Replace("Microsoft::FSharp::Collections", "")
-        // .Replace("System::Collections::Generic::List_1", "::ResizeArray_1")
-    
+// .Replace("System::Collections::Generic::List_1", "::ResizeArray_1")
+
 let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
     let path =
         match mfv.DeclaringEntity with
@@ -45,6 +56,7 @@ let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
             let path = cpp + "::" + mfv.CompiledName
             path
         | None -> failwith "Empty declaring entity for module variable"
+
     replaceIncludedBCLNamespaces path
 
 let typeName (t: FSharpType) =
@@ -68,9 +80,24 @@ let typeName (t: FSharpType) =
         $"{baseTy}<{args}>"
     |> replaceIncludedBCLNamespaces
 
-let entTypeName (ent: FSharpEntity) =
-    ent.BasicQualifiedName
-    |> toCppPath
+let entTypeName (ent: FSharpEntity) = ent.BasicQualifiedName |> toCppPath
+
+let rec needsTempRef (e: FSharpExpr) =
+    match e with
+    | _ when not (requiresGc e.Type) -> false
+    | P.Const _ -> false
+    | P.Call(None, _, [], [], []) -> false
+    | P.Value mfv -> mfv.IsMutable
+    | P.DefaultValue _ when requiresGc e.Type -> false
+    | P.Coerce(ty, expr) -> requiresGc ty && needsTempRef expr
+    | P.ILAsm(asm, _, _) when replacements.ContainsKey asm -> false
+    | _ -> true
+
+let translateCallArg (e: FSharpExpr) =
+    if needsTempRef e then
+        Call(GetField(Call(Var "TempRef", [ translate e ]), "get"), [])
+    else
+        translate e
 
 let rec translate (e: FSharpExpr) : CppExpr =
     match e with
