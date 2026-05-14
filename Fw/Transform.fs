@@ -119,11 +119,35 @@ let rec translate (e: FSharpExpr) : CppExpr =
     | P.Coerce(ty, value) when requiresGc ty ->
         let rt = tyConvert value.Type |> printType
 
-        CallGen(
-            Var "dynamic_cast",
-            [ Var(tyConvert ty |> printType) ],
-            [ CallGen(Var "static_cast", [ Var rt ], [ translate value ]) ]
-        )
+        if requiresGc value.Type then
+            CallGen(
+                Var "dynamic_cast",
+                [ Var(tyConvert ty |> printType) ],
+                [ CallGen(Var "static_cast", [ Var rt ], [ translate value ]) ]
+            )
+        else
+            CallGen(
+                Var "dynamic_cast",
+                [ Var(tyConvert ty |> printType) ],
+                [
+                    Call(
+                        DerefGetField(
+                            Call(
+                                Var "new (UseGC) System::Box",
+                                [
+                                    CallGen(
+                                        Var "static_cast",
+                                        [ Var rt ],
+                                        [ translate value ]
+                                    )
+                                ]
+                            ),
+                            "get"
+                        ),
+                        []
+                    )
+                ]
+            )
     | P.Const(o, t) ->
         if isUnit t then
             ExprComment "Unit ()"
@@ -133,17 +157,12 @@ let rec translate (e: FSharpExpr) : CppExpr =
             Const(o, t)
     | P.Call(None, mfv, [], [], []) -> Var(qualifiedPath mfv)
     | P.Call(None, mfv, xs, [], args) ->
-        if xs.Length > 0 then
-            ()
-
         let path = qualifiedPath mfv
-        Call(Var path, List.map translate args)
+        Call(Var path, List.map translateCallArg args)
     | P.Call(None, mfv, xs, ys, args) ->
         let path = qualifiedPath mfv
-
         let genArgs = ys |> List.map (tyConvert >> printType >> Var)
-
-        CallGen(Var path, genArgs, List.map translate args)
+        CallGen(Var path, genArgs, List.map translateCallArg args)
     | P.Call(Some o, mfv, xs, ys, args) ->
         let case =
             if o.Type.TypeDefinition.IsValueType then
@@ -164,7 +183,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
         else
             Lambda([ mfv.CompiledName ], stmts, [])
     | P.Value mfv when mfv.CompiledName = "bind@" -> Var "bind"
-    | P.Value mfv -> Var (mfv.CompiledName |> replaceIncludedBCLNamespaces)
+    | P.Value mfv -> Var(mfv.CompiledName |> replaceIncludedBCLNamespaces)
     | P.ThisValue _ty -> Var "this"
     | P.FSharpFieldGet(Some expr, ty, field) ->
         // TODO : check if e.Type.TypeDefinition is a reference type
@@ -192,18 +211,31 @@ let rec translate (e: FSharpExpr) : CppExpr =
                 $"{basePath}<{args}>"
 
         if not (requiresGc (mfv.DeclaringEntity.Value.AsType())) then
-            Call(Var ctor, List.map translate args)
+            Call(Var ctor, List.map translateCallArg args)
         else
             CallGen(
                 Var "GcRoot",
                 [ Var(ctor + "*") ],
-                [ Call(Var $"new (UseGC) {ctor}", List.map translate args) ]
+                [
+                    Call(
+                        Var $"new (UseGC) {ctor}",
+                        List.map translateCallArg args
+                    )
+                ]
             )
     | P.Let((mfv, value, _dbg), body) ->
-        let var = Let((if mfv.CompiledName = "bind@" then "bind" else mfv.CompiledName), translate value)
+        let var =
+            Let(
+                (if mfv.CompiledName = "bind@" then
+                     "bind"
+                 else
+                     mfv.CompiledName),
+                translate value
+            )
+
         let cppBody = var :: translateS body
         let withReturn = addReturn cppBody
-        Call(Lambda([], withReturn, ["&"]), [])
+        Call(Lambda([], withReturn, [ "&" ]), [])
     | P.ILAsm(asm, _types, _values) ->
         match asm with
         | "[I_call\n   (Normalcall,\n    Microsoft.FSharp.Core.LanguagePrimitives::get_GenericComparer(...)(...),\n    None)]" ->
@@ -218,10 +250,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
     | P.DefaultValue t when requiresGc t -> Var "nullptr"
     | P.NewRecord(ty, values) when requiresGc ty ->
         let t = tyConvert ty |> printType |> _.Replace("*", "")
-        Call(
-            Var $"new (UseGC) {t}",
-            List.map translate values
-        )
+        Call(Var $"new (UseGC) {t}", List.map translate values)
     | _ -> ExprComment $"%A{e}"
 
 and translateS (e: FSharpExpr) : CppStmt list =
@@ -240,7 +269,7 @@ and translateS (e: FSharpExpr) : CppStmt list =
     | P.Let((mfv, exp, _dbg), body) ->
         let name, _ty, value = translateVar mfv exp
         // Let(name, value) :: translateS body
-        SVariable (name, Auto, Some value) :: translateS body
+        SVariable(name, Auto, Some value) :: translateS body
     | P.ValueSet(mfv, value) -> [
         Assign(Var mfv.CompiledName, translate value)
       ]
@@ -359,22 +388,32 @@ let funTyConvert (t: FSharpType) =
     Gen("std::function", [ Named $"{rt}({args})" ])
 
 let requiresGc (t: FSharpType) =
-    if t.TypeDefinition.IsValueType then
-        false
-    else
-        match t.TypeDefinition.AccessPath with
-        | "Microsoft.FSharp.Core" ->
-            match t.TypeDefinition.CompiledName with
-            | "int" -> false
-            | "int32" -> false
-            | "bool" -> false
-            | "byref`1" -> false
-            // $"{tyConvert t.GenericArguments[0] |> printType}*"
-            | "obj" -> true
-            | "PrintfFormat`5" -> false
-            | _ ->
-                failwith "Not sure of Microsoft.FSharp.Core type in requiresGc"
-        | _ -> true
+    try
+        if t.IsFunctionType then
+            true
+        elif t.TypeDefinition.IsValueType then
+            false
+        elif isUnit t then
+            false
+        else
+            match t.TypeDefinition.AccessPath with
+            | "Microsoft.FSharp.Core" ->
+                match t.TypeDefinition.CompiledName with
+                | "int" -> false
+                | "int32" -> false
+                | "bool" -> false
+                | "byref`1" -> false
+                // $"{tyConvert t.GenericArguments[0] |> printType}*"
+                | "obj" -> true
+                | "PrintfFormat`5" -> false
+                | "string" -> true
+                | _ ->
+                    failwith
+                        $"Not sure of Microsoft.FSharp.Core type {t.TypeDefinition.CompiledName} in requiresGc"
+            | _ -> true
+    with ex ->
+        printfn $"{ex}"
+        reraise ()
 
 let tyConvert (t: FSharpType) =
     if t.IsGenericParameter then
