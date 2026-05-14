@@ -160,6 +160,8 @@ type CppCompiler() =
     member private this.ProcessEntity entity declarations =
         if entity.IsFSharpModule then
             this.Module entity declarations
+        elif entity.IsInterface then
+            this.Interface entity declarations
         else
             this.Class entity declarations
 
@@ -171,6 +173,33 @@ type CppCompiler() =
                     this.ProcessDecl decl
             ]
         )
+
+    member private this.Interface entity declarations =
+        Ast.Class {
+            name = entity.CompiledName
+            decls = [
+                for mfv in entity.MembersFunctionsAndValues do
+                    let args = toMethodArgs mfv.CurriedParameterGroups
+                    let rt = Transform.tyConvert mfv.ReturnParameter.Type
+                    let virtName = mfv.FullName.Replace(".", "_")
+                    let argNames = args |> List.map fst
+                    Ast.DeletedVirtual(virtName, { rt = rt; args = args })
+
+                    Ast.Function(
+                        mfv.CompiledName,
+                        { rt = rt; args = args },
+                        Some [
+                            Ast.Exp(
+                                Ast.Call(
+                                    Ast.Var virtName,
+                                    argNames |> List.map Ast.Var
+                                )
+                            )
+                        ]
+                    )
+            ]
+            inherits = [ "virtual System::Object" ]
+        }
 
     member private this.Class entity declarations =
         let fields =
@@ -204,6 +233,9 @@ type CppCompiler() =
 
         let inherits =
             match entity.BaseType with
+            | Some bt when bt.BasicQualifiedName = "Microsoft.FSharp.Core.obj" -> [
+                "virtual System::Object"
+              ]
             | Some bt -> [ Transform.typeName bt ]
             | _ -> []
 
@@ -278,21 +310,21 @@ type CppCompiler() =
             match r.StartColumn with
             | 0 -> $"__{r.StartLine}"
             | c -> $"__{r.StartLine}_{c}"
-        
+
         // We represent init actions with static IIFE lambdas
         Ast.INIT body
-        // Ast.Sequence [
-        //     Ast.Variable(
-        //         tag,
-        //         Ast.Auto,
-        //         Some(
-        //             Ast.Call(
-        //                 Ast.Lambda([], body @ [ Ast.Return(Ast.Var "0") ], []),
-        //                 []
-        //             )
-        //         )
-        //     )
-        // ]
+    // Ast.Sequence [
+    //     Ast.Variable(
+    //         tag,
+    //         Ast.Auto,
+    //         Some(
+    //             Ast.Call(
+    //                 Ast.Lambda([], body @ [ Ast.Return(Ast.Var "0") ], []),
+    //                 []
+    //             )
+    //         )
+    //     )
+    // ]
 
     member private this.ProcessMfv mfv curriedArgs body =
         let stmts =

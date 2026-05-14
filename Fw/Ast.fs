@@ -28,6 +28,7 @@ type CppDecl =
   | Namespace of name: string * decls: CppDecl list
   | Template of args: string list * decl: CppDecl
   | Class of CppClass
+  | DeletedVirtual of name: string * signature: FunctionSignature
   | Function of
     name: string *
     signature: FunctionSignature *
@@ -288,6 +289,8 @@ let rec printDecl (decl: CppDecl) =
     let txtBody = shadowVariables names body |> printBody
 
     $"{tyName}({printArgs args}) {{ {txtBody} }}"
+  | DeletedVirtual(name, signature) ->
+      $"virtual {printFsig name signature} = 0;"
   | Function(name, signature, Some body) ->
     let names = signature.args |> List.map fst
 
