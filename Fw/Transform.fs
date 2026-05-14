@@ -82,22 +82,30 @@ let typeName (t: FSharpType) =
 
 let entTypeName (ent: FSharpEntity) = ent.BasicQualifiedName |> toCppPath
 
-let rec needsTempRef (e: FSharpExpr) =
+let rec requiresTempRef (e: FSharpExpr) =
     match e with
     | _ when not (requiresGc e.Type) -> false
     | P.Const _ -> false
-    | P.Call(None, _, [], [], []) -> false
+    | P.Call(None, mfv, [], [], []) -> mfv.IsMutable
     | P.Value mfv -> mfv.IsMutable
     | P.DefaultValue _ when requiresGc e.Type -> false
-    | P.Coerce(ty, expr) -> requiresGc ty && needsTempRef expr
+    | P.Coerce(ty, expr) -> requiresGc ty && requiresTempRef expr
     | P.ILAsm(asm, _, _) when replacements.ContainsKey asm -> false
     | _ -> true
 
 let translateCallArg (e: FSharpExpr) =
-    if needsTempRef e then
-        Call(GetField(Call(Var "TempRef", [ translate e ]), "get"), [])
+    if requiresTempRef e then
+        Call(GetField(Call(Var "GcRoot", [ translate e ]), "get"), [])
     else
         translate e
+        
+let translateVar (mfv: FSharpMemberOrFunctionOrValue) body =
+    let value = translate body
+    if requiresGc mfv.FullType then
+        Call (Var "GcRoot", [ value ])
+    else
+        value
+        
 
 let rec translate (e: FSharpExpr) : CppExpr =
     match e with
@@ -133,7 +141,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
                     Call(
                         DerefGetField(
                             Call(
-                                Var "new (UseGC) System::Box",
+                                Var "gcnew System::Box",
                                 [
                                     CallGen(
                                         Var "static_cast",
@@ -213,15 +221,9 @@ let rec translate (e: FSharpExpr) : CppExpr =
         if not (requiresGc (mfv.DeclaringEntity.Value.AsType())) then
             Call(Var ctor, List.map translateCallArg args)
         else
-            CallGen(
-                Var "GcRoot",
-                [ Var(ctor + "*") ],
-                [
-                    Call(
-                        Var $"new (UseGC) {ctor}",
-                        List.map translateCallArg args
-                    )
-                ]
+            Call(
+                Var $"gcnew {ctor}",
+                List.map translateCallArg args
             )
     | P.Let((mfv, value, _dbg), body) ->
         let var =
@@ -232,7 +234,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
                      mfv.CompiledName),
                 translate value
             )
-
+    
         let cppBody = var :: translateS body
         let withReturn = addReturn cppBody
         Call(Lambda([], withReturn, [ "&" ]), [])
@@ -250,7 +252,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
     | P.DefaultValue t when requiresGc t -> Var "nullptr"
     | P.NewRecord(ty, values) when requiresGc ty ->
         let t = tyConvert ty |> printType |> _.Replace("*", "")
-        Call(Var $"new (UseGC) {t}", List.map translate values)
+        Call(Var $"gcnew {t}", List.map translate values)
     | _ -> ExprComment $"%A{e}"
 
 and translateS (e: FSharpExpr) : CppStmt list =
@@ -267,9 +269,7 @@ and translateS (e: FSharpExpr) : CppStmt list =
             yield! translateS body
         ]
     | P.Let((mfv, exp, _dbg), body) ->
-        let name, _ty, value = translateVar mfv exp
-        // Let(name, value) :: translateS body
-        SVariable(name, Auto, Some value) :: translateS body
+        SVariable (mfv.CompiledName, Auto, Some (translateVar mfv exp)) :: translateS body
     | P.ValueSet(mfv, value) -> [
         Assign(Var mfv.CompiledName, translate value)
       ]
@@ -438,14 +438,3 @@ let tyConvert (t: FSharpType) =
             else if requiresGc t then Named(typeName t + "*")
             else Named(typeName t)
 
-let translateVar (mfv: FSharpMemberOrFunctionOrValue) body =
-    let ty =
-        let baseTy = tyConvert mfv.FullType
-
-        if requiresGc mfv.FullType then
-            Gen("GcRoot", [ baseTy ])
-        else
-            baseTy
-
-    let value = translate body
-    mfv.CompiledName, ty, value

@@ -422,5 +422,5 @@ type CppCompiler() =
             fn
 
     member private this.Value mfv body =
-        let name, ty, value = Transform.translateVar mfv body
-        Ast.Variable(name, ty, Some value)
+        let value = Transform.translateVar mfv body
+        Ast.Variable(mfv.CompiledName, Ast.Auto, Some value)
