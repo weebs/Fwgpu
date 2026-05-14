@@ -301,3 +301,30 @@ main ()
 
         let result = compileAndRunCode "basic_records" src
         xunit.WriteLine result.output
+        
+    [<Fact>]
+    let ``interfaces`` () =
+        let src = "
+open System
+
+type IPrint =
+    abstract member Print : unit -> unit
+    
+type Printy() =
+    interface IPrint with member this.Print () = Console.WriteLine \"hi\"
+    
+type [<Struct>] PrintyStruct(n: int) =
+    interface IPrint with member this.Print () = Console.WriteLine \"hi (struct)\"
+
+let usesPrinty (p: IPrint) =
+    p.Print()
+
+let p = Printy()
+let p2 = PrintyStruct(42)
+
+usesPrinty p
+usesPrinty p2
+"
+        let result = compileAndRunCode "interfaces" src
+        xunit.WriteLine result.output
+        Assert.Equal("hi\nhi (struct)\n", result.output)
