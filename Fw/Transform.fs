@@ -129,9 +129,9 @@ let rec translate (e: FSharpExpr) : CppExpr =
 
         if requiresGc value.Type then
             CallGen(
-                Var "dynamic_cast",
-                [ Var(tyConvert ty |> printType) ],
-                [ CallGen(Var "static_cast", [ Var rt ], [ translate value ]) ]
+                Var "::coerce",
+                [ Var rt; (tyConvert ty |> printType |> Var) ],
+                [ translate value ]
             )
         else
             CallGen(
