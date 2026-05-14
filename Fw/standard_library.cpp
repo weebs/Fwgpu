@@ -39,6 +39,8 @@ template <typename T> using Gc = T *;
 namespace System {
 class Object;
 }
+
+#define gcnew new (UseGC)
 std::vector<System::Object **> objectRoots;
 
 template <typename T>
@@ -53,6 +55,7 @@ public:
   ~GcRoot() { objectRoots.pop_back(); }
   T operator->() { return data; }
   operator T() { return data; }
+  T get() { return data; }
   GcRoot(const GcRoot &) = delete;
 //   GcRoot &operator=(const GcRoot &) = delete;
 };
@@ -165,7 +168,7 @@ class IEqualityComparer {};
 
 namespace Generic {
 template <typename T>
-class List_1 : public System::Object, public IEnumerable_1<T> {
+class List_1 : public virtual System::Object, public IEnumerable_1<T> {
   std::vector<T, gc_allocator<T>> items;
 
 public:
@@ -215,9 +218,9 @@ namespace Collections {
 template <typename T>
 using ResizeArray_1 = System::Collections::Generic::List_1<T>;
 
-template <typename T> class list_1 {};
+template <typename T> class list_1 : public virtual System::Object {};
 
-template <typename T> class seq_1 {};
+template <typename T> class seq_1 : public virtual System::Object {};
 
 namespace SeqModule {
 template <typename T> list_1<T> *ToList(seq_1<T> *xs);
