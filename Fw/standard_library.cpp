@@ -97,23 +97,20 @@ public:
 class String : public Object {
 public:
   char *data;
+  // std::string data;
   String() : data(nullptr) {}
   String(const char *chars) {
     auto length = strlen(chars) + 1;
     data = (char *)GC_malloc_atomic(length);
     memcpy(data, chars, length);
   }
+  String(const std::string& str) : String(str.c_str()) {
+  }
+
+  operator std::string() { return std::string(data); }
 
   bool operator==(const String &other) const {
-    auto lenA = strlen(data);
-    auto lenB = strlen(other.data);
-    if (lenA != lenB)
-      return false;
-    for (int i = 0; i < lenA; i++) {
-      if (data[i] != other.data[i])
-        return false;
-    }
-    return true;
+    return strcmp(data, other.data) == 0;
   }
 };
 
@@ -296,12 +293,14 @@ Collections::seq_1<T> *CreateSequence(Collections::seq_1<T> *xs) {
   return xs;
 }
 
-// std::string ToString(int x) { return std::string(""); }
-std::string ToString(int x) { return std::to_string(x); }
+// std::string ToString(int x) { return std::to_string(x); }
 
-template <typename T> std::string ToString(T x) {
+System::String ptr_to_string(System::Object* x) {
+  return x->ToString();
+}
+template <typename T> System::String ToString(T x) {
   if constexpr (std::is_pointer_v<T>) {
-    return x->ToString();
+    return ptr_to_string(x);
   } else if constexpr (std::is_arithmetic_v<T>) {
     // For int, double, float, etc.
     return std::to_string(x);
