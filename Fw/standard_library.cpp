@@ -57,6 +57,17 @@ public:
 //   GcRoot &operator=(const GcRoot &) = delete;
 };
 
+template <typename T>
+  requires std::derived_from<std::remove_pointer_t<T>, System::Object>
+class TempRef {
+public:
+  T data;
+  TempRef(T object) : data(object) {}
+  T operator->() { return data; }
+  operator T() { return data; }
+  T get() { return data; }
+};
+
 namespace System {
 class Object {
 
