@@ -29,7 +29,8 @@ static std::ios_base::Init __stream_initializer;
   ();
 #endif
 
-template <typename T> class Ref {
+template <typename U> class Ref {
+  using T = std::remove_pointer_t<U>;
 public:
   T *Value;
   // Ref() : Value(nullptr) {}
@@ -53,6 +54,11 @@ public:
 
   Ref &operator=(const T &value) {
     *Value = value;
+    return *this;
+  }
+  
+  Ref &operator=(T* value) {
+    *Value = *value;
     return *this;
   }
 };

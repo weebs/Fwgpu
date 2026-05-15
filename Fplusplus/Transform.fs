@@ -404,18 +404,14 @@ and translateS (e: FSharpExpr) : CppStmt list =
         )
       ]
     | P.LetRec(bindings, body) -> [
-        // todo : mfvBody needs to capture mfv by reference
         for mfv, mfvBody, _dbg in bindings do
-            // todo : hack
-            let t = tyConvert mfv.FullType |> printType |> _.Replace("*", "")
             SVariable(
                 mfv.CompiledName,
-                Gen("Ref", [ Named t ]),
+                Gen("Ref", [ tyConvert mfv.FullType ]),
                 None
             )
 
-            Assign(Deref(GetField(Var mfv.CompiledName, "Value")), Deref(translate mfvBody))
-        // SVariable(mfv.CompiledName, tyConvert mfv.FullType, Some value)
+            Assign(Var mfv.CompiledName, translate mfvBody)
         yield! translateS body
       ]
     | P.LetRec _ -> [ SComment $"%A{e}" ]
