@@ -11,6 +11,7 @@ type CppTy =
     | Named of string
     | Auto
     | Gen of template: string * args: CppTy list
+    | Ptr of CppTy
 
 type ArgSig = (string * CppTy) list
 
@@ -46,12 +47,14 @@ type CppExpr =
     | Var of string
     | Const of obj * FSharpType
     | Call of callee: CppExpr * args: CppExpr list
+    | ExprBlock of body: CppStmt list
     | CallGen of callee: CppExpr * genArgs: CppExpr list * args: CppExpr list
     | Lambda of args: string list * body: CppStmt list * captures: string list
     | ExprComment of string
     | GetField of src: CppExpr * field: string
     | DerefGetField of src: CppExpr * field: string
     | ObjectInitializer of ty: CppTy * record: (string * CppExpr) list
+    | New of ctor: string * args: CppExpr list
 
     static let sourceMappings =
         System.Runtime.CompilerServices.ConditionalWeakTable<CppExpr, Metadata>()
@@ -94,6 +97,9 @@ and CppStmt =
 let rec print (e: CppExpr) =
     match e with
     | Var s -> s
+    | New (ctor, args) ->
+        let txtArgs = args |> List.map print |> String.concat ", "
+        $"new {ctor}({txtArgs})"
     | Const(o, ty) -> $"%A{o}"
     | Call(callee, args) ->
         let txtArgs = args |> List.map print |> String.concat ", "
@@ -129,6 +135,8 @@ let rec print (e: CppExpr) =
             |> String.concat ", "
 
         $"{printType ty} {{ {txtFields} }}"
+    | ExprBlock body ->
+        $"({{{printBody body}}})"
 
 
 and printStmt (s: CppStmt) =
@@ -155,6 +163,7 @@ and printBody (body: CppStmt list) =
 
 and printType (ty: CppTy) =
     match ty with
+    | Ptr t -> printType t + "*"
     | Auto -> "auto"
     | Void -> "void"
     | Named s -> s
@@ -290,6 +299,8 @@ let rec shadowVariables
                 [ Scope(l :: shadowVariables (name :: vars) rest) ]
             else
                 l :: shadowVariables (name :: vars) rest
+        | Exp (ExprBlock body) ->
+            Exp (ExprBlock (shadowVariables [] body)) :: shadowVariables vars rest
         | Assign _
         | Return _
         | SComment _

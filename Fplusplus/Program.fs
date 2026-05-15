@@ -15,6 +15,8 @@ let sourceCode = File.ReadAllText TextFile.``foo.fsx``.Path
 let cc = CppCompiler()
 let result =
     Tests.Compiler.compileAndRunCode "foo" sourceCode
+    
+printfn $"{result.code}"
 printfn $"{result.output}"
 // let output = Path.Join(__SOURCE_DIRECTORY__, "cpp/foo.cpp")
 // File.WriteAllText(output, "#include \"../standard_library.cpp\"\n" + code)

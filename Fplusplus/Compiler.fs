@@ -345,12 +345,18 @@ type CppCompiler() =
                 mfv.CompiledName
 
         if mfv.IsValue then
-            this.Value mfv body
+            let value = Transform.translateVar mfv body
+            Ast.Variable(mfv.CompiledName, Ast.Auto, Some value)
         elif mfv.IsConstructor then
             this.Constructor mfv curriedArgs body
         elif mfv.IsMember && mfv.IsFunction then
             // todo : Member function?
             this.Function mfv curriedArgs body
+        elif mfv.IsFunction && curriedArgs = [] then
+            // Lambda values
+            let value = Transform.translateVar mfv body
+            let lambda = Ast.Lambda([], [ Ast.Return value ], [])
+            Ast.Variable(mfv.CompiledName, Ast.Auto, Some (Ast.Call(lambda, [])))
         elif mfv.IsFunction then
             this.Function mfv curriedArgs body
         else
@@ -420,7 +426,3 @@ type CppCompiler() =
             Ast.Template(templateArgs, fn)
         else
             fn
-
-    member private this.Value mfv body =
-        let value = Transform.translateVar mfv body
-        Ast.Variable(mfv.CompiledName, Ast.Auto, Some value)

@@ -128,17 +128,8 @@ type AdderWithN(n: int) =
   member this.Add x y = x + y + n
   member this.Add2 (x, y) = x + y + n
   "
-
-        let cc = CppCompiler()
-        let code = cc.Compile sourceCode
-        xunit.WriteLine $"{sourceCode}\n{code}\n=========="
-
-        let fullCode = Deps.core + "\n" + code |> Format.source
-
-        File.WriteAllText(
-            "/Users/sbeew/repos/Fwgpu/Fw/cpp/simpleclass.cpp",
-            fullCode
-        )
+        let result = compileAndRunCode "basic_instance_method" sourceCode
+        xunit.WriteLine result.output
 
     [<Fact>]
     let ``basic class`` () =
