@@ -270,11 +270,12 @@ main ()
 let main () =
   let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2)
   fib 7
-main ()
+System.Console.WriteLine (string (main ()))
 "
 
         let result = compileAndRunCode "recursive_lambda" src
-        xunit.WriteLine result.code
+        xunit.WriteLine result.output
+        Assert.Equal("13\n", result.output)
 
     [<Fact>]
     let ``basic records`` () =

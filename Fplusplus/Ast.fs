@@ -49,6 +49,7 @@ type CppExpr =
     | Var of string
     | Const of obj * FSharpType
     | Ref of CppExpr
+    | Deref of CppExpr
     | Call of callee: CppExpr * args: CppExpr list
     | BlockExpr of body: CppStmt list
     | CallGen of callee: CppExpr * genArgs: CppExpr list * args: CppExpr list
@@ -100,6 +101,7 @@ and CppStmt =
 let rec print (e: CppExpr) =
     match e with
     | Ref expr -> $"&{print expr}"
+    | Deref expr -> $"*{print expr}"
     | Var s -> s
     | New (ctor, args) ->
         let txtArgs = args |> List.map print |> String.concat ", "

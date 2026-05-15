@@ -117,18 +117,14 @@ let rec translate (e: FSharpExpr) : CppExpr =
     // todo : hack
     | P.Value mfv when mfv.CompiledName = "bind@" -> Var "bind"
     | P.Value mfv ->
-        if mfv.IsMutable && requiresGc mfv.FullType  then
+        if mfv.IsMutable && requiresGc mfv.FullType then
             GetField(Var mfv.CompiledName, "Value")
         else
             Var(mfv.CompiledName |> replaceIncludedBCLNamespaces)
     | P.TypeTest(ty, expr) ->
         let tyTarget = tyConvert ty
 
-        CallGen(
-            Var "::IsType",
-            [ Var(printType tyTarget) ],
-            [ translate expr ]
-        )
+        CallGen(Var "::IsType", [ Var(printType tyTarget) ], [ translate expr ])
     | P.DecisionTreeSuccess(idx, exprs) ->
         Call(Var $"_{idx}", List.map translate exprs)
     | P.Coerce(ty, value) when not (requiresGc ty) ->
@@ -400,14 +396,28 @@ and translateS (e: FSharpExpr) : CppStmt list =
                 withVar,
                 withExpr,
                 dbgTry,
-                dbgWith) ->
-        [
-            TryCatch(
-                translateS tryExpr,
-                $"const System::Exception& {withVar.CompiledName}",
-                translateS withExpr
+                dbgWith) -> [
+        TryCatch(
+            translateS tryExpr,
+            $"const System::Exception& {withVar.CompiledName}",
+            translateS withExpr
+        )
+      ]
+    | P.LetRec(bindings, body) -> [
+        // todo : mfvBody needs to capture mfv by reference
+        for mfv, mfvBody, _dbg in bindings do
+            // todo : hack
+            let t = tyConvert mfv.FullType |> printType |> _.Replace("*", "")
+            SVariable(
+                mfv.CompiledName,
+                Gen("Ref", [ Named t ]),
+                None
             )
-        ]
+
+            Assign(Deref(GetField(Var mfv.CompiledName, "Value")), Deref(translate mfvBody))
+        // SVariable(mfv.CompiledName, tyConvert mfv.FullType, Some value)
+        yield! translateS body
+      ]
     | P.LetRec _ -> [ SComment $"%A{e}" ]
     | _ -> [ Exp(translate e) ]
 

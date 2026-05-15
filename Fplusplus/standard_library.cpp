@@ -32,7 +32,8 @@ static std::ios_base::Init __stream_initializer;
 template <typename T> class Ref {
 public:
   T *Value;
-  Ref() : Value(nullptr) {}
+  // Ref() : Value(nullptr) {}
+  Ref() : Value((T*)GC_malloc(sizeof(T))) {}
   Ref(const T &value) {
     Value = (T *)GC_malloc(sizeof(T));
     // *Value = value;
@@ -126,7 +127,6 @@ template <typename T> bool IsType(Gc<System::Object> obj) {
 
 template <typename A, typename B> class FSharpFunc : public System::Object {
   std::function<B(A)> fn;
-
 public:
   FSharpFunc(std::function<B(A)> fn) : fn(fn) {}
   FSharpFunc *operator->() { return this; }
@@ -134,6 +134,10 @@ public:
   B operator()(A a) { return fn(a); }
   B invoke(A a) { return fn(a); }
   operator std::function<B(A)> &() { return fn; }
+  FSharpFunc &operator=(const FSharpFunc &other) {
+    fn = other.fn;
+    return *this;
+  }
 };
 template <typename B> class FSharpFunc<void, B> : public System::Object {
   std::function<B()> fn;
@@ -340,12 +344,17 @@ template <typename T> T FailWith(System::String error) {
   throw System::Exception(error);
 }
 
+template <typename A, typename B> bool op_LessThanOrEqual(A a, B b) { return a <= b; }
 template <typename T> T op_LeftShift(T x, int n) { return x << n; }
 
 template <typename T> T op_RightShift(T x, int n) { return x >> n; }
 
 template <typename A, typename B, typename C> C op_Addition(A x, B y) {
   return x + y;
+}
+  
+template <typename A, typename B, typename C> C op_Subtraction(A x, B y) {
+  return x - y;
 }
 
 template <typename A, typename B, typename C> C op_Multiply(A x, B y) {
