@@ -99,6 +99,7 @@ and CppStmt =
 
 let rec print (e: CppExpr) =
     match e with
+    | Ref expr -> $"&{print expr}"
     | Var s -> s
     | New (ctor, args) ->
         let txtArgs = args |> List.map print |> String.concat ", "

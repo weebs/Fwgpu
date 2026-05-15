@@ -15,7 +15,11 @@ let replacements =
 
 let isUnit (t: FSharpType) =
     try
-        if t.IsFunctionType then
+        if not t.HasTypeDefinition then
+            false
+        elif t.TypeDefinition.IsByRef then
+            false
+        elif t.IsFunctionType then
             false
         elif t.IsGenericParameter then
             false
@@ -110,15 +114,18 @@ let rec translate (e: FSharpExpr) : CppExpr =
     | P.AddressOf expr -> Ref(translate expr)
     | P.ThisValue _ty -> Var "this"
     | P.Call(None, mfv, [], [], []) -> Var(qualifiedPath mfv)
+    // todo : hack
     | P.Value mfv when mfv.CompiledName = "bind@" -> Var "bind"
-    | P.Value mfv when mfv.IsMutable && requiresGc mfv.FullType ->
-        GetField(Var mfv.CompiledName, "Value")
-    | P.Value mfv -> Var(mfv.CompiledName |> replaceIncludedBCLNamespaces)
+    | P.Value mfv ->
+        if mfv.IsMutable && requiresGc mfv.FullType  then
+            GetField(Var mfv.CompiledName, "Value")
+        else
+            Var(mfv.CompiledName |> replaceIncludedBCLNamespaces)
     | P.TypeTest(ty, expr) ->
         let tyTarget = tyConvert ty
 
         CallGen(
-            Var "System::IsType",
+            Var "::IsType",
             [ Var(printType tyTarget) ],
             [ translate expr ]
         )
@@ -210,7 +217,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
         |> fun lambda ->
             let argTy = mfv.FullType |> tyConvert |> printType
             let rt = body.Type |> tyConvert |> printType
-            New($"FSharpFunc<{argTy}, {rt}>", [ lambda ])
+            New($"::FSharpFunc<{argTy}, {rt}>", [ lambda ])
     | P.FSharpFieldGet(Some expr, _ty, field) ->
         match expr with
         | expr when expr.Type.TypeDefinition.IsValueType = false ->
@@ -394,7 +401,6 @@ and translateS (e: FSharpExpr) : CppStmt list =
                 withExpr,
                 dbgTry,
                 dbgWith) ->
-        // todo : Todo exception filters
         [
             TryCatch(
                 translateS tryExpr,
@@ -402,6 +408,7 @@ and translateS (e: FSharpExpr) : CppStmt list =
                 translateS withExpr
             )
         ]
+    | P.LetRec _ -> [ SComment $"%A{e}" ]
     | _ -> [ Exp(translate e) ]
 
 let isByRef (t: FSharpType) =
@@ -431,8 +438,8 @@ let requiresGc (t: FSharpType) =
                 | "int32" -> false
                 | "bool" -> false
                 | "byref`1" -> false
-                // $"{tyConvert t.GenericArguments[0] |> printType}*"
                 | "obj" -> true
+                // todo : printf format
                 | "PrintfFormat`5" -> false
                 | "string" -> true
                 | _ ->
@@ -453,7 +460,7 @@ let tyConvert (t: FSharpType) =
     elif t.IsFunctionType then
         let a = t.GenericArguments[0]
         let b = t.GenericArguments[1]
-        Ptr(Gen("FSharpFunc", [ tyConvert a; tyConvert b ]))
+        Ptr(Gen("::FSharpFunc", [ tyConvert a; tyConvert b ]))
     else
         match t.TypeDefinition.AccessPath with
         | "Microsoft.FSharp.Core" ->
