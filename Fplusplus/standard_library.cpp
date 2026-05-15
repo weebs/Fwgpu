@@ -29,6 +29,7 @@ template <typename T>
 class Ref {
 public:
   T* Value;
+  Ref() : Value(nullptr) {}
   Ref(const T& value) {
     Value = (T*)GC_malloc(sizeof(T));
     // *Value = value;
@@ -41,7 +42,10 @@ public:
   operator const T&() const { return *Value; }
   T* operator->() { return Value; }
   const T* operator->() const { return Value; }
-  Ref& operator=(const Ref&) = delete;
+  Ref& operator=(const Ref& other) {
+    *Value = other.Value;
+    return *this;
+  }
 
 
   Ref& operator=(const T& value) {
