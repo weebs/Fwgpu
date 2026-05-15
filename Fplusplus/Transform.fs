@@ -287,8 +287,8 @@ and translateS (e: FSharpExpr) : CppStmt list =
             if mfv.IsMutable then
                 SVariable(
                     varName,
-                    Auto,
-                    Some(Call(Var "Ref", [ translateVar mfv exp ]))
+                    Gen("Ref", [ tyConvert exp.Type ]),
+                    Some(translateVar mfv exp)
                 )
             else
                 SVariable(

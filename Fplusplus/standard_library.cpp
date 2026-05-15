@@ -33,15 +33,11 @@ template <typename U> class Ref {
   using T = std::remove_pointer_t<U>;
 public:
   T *Value;
-  // Ref() : Value(nullptr) {}
   Ref() : Value((T*)GC_malloc(sizeof(T))) {}
   Ref(const T &value) {
     Value = (T *)GC_malloc(sizeof(T));
-    // *Value = value;
     new (Value) T(value);
   }
-  Ref(T *value) : Value(value) {}
-  // Ref(const Ref&) = delete;
   Ref(const Ref &other) : Value(other.Value) {};
   operator T &() { return *Value; }
   operator const T &() const { return *Value; }
