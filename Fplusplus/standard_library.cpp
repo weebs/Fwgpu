@@ -35,7 +35,8 @@ public:
     new (Value) T(value);
   }
   Ref(T* value) : Value(value) {}
-  Ref(const Ref&) = delete;
+  // Ref(const Ref&) = delete;
+  Ref(const Ref& other) : Value(other.Value) {};
   operator T&() { return *Value; }
   operator const T&() const { return *Value; }
   T* operator->() { return Value; }
@@ -127,6 +128,17 @@ public:
   B operator()(A a) { return fn(a); }
   B invoke(A a) { return fn(a); }
   operator std::function<B(A)>&() { return *fn; }
+};
+template <typename B>
+class FSharpFunc<void, B> : public System::Object {
+std::function<B()> fn;
+public:
+  FSharpFunc(std::function<B()> fn) : fn(fn) {}
+  FSharpFunc* operator->() { return this; }
+
+  // B operator()(A a) { return fn(a); }
+  B invoke() { return fn(); }
+  operator std::function<B()>&() { return fn; }
 };
 
 

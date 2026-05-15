@@ -49,7 +49,7 @@ type CppExpr =
     | Call of callee: CppExpr * args: CppExpr list
     | ExprBlock of body: CppStmt list
     | CallGen of callee: CppExpr * genArgs: CppExpr list * args: CppExpr list
-    | Lambda of args: string list * body: CppStmt list * captures: string list
+    | Lambda of args: string list * isMutable: bool * body: CppStmt list * captures: string list
     | ExprComment of string
     | GetField of src: CppExpr * field: string
     | DerefGetField of src: CppExpr * field: string
@@ -108,17 +108,18 @@ let rec print (e: CppExpr) =
         let txtArgs = args |> List.map print |> String.concat ", "
         let txtGenArgs = genArgs |> List.map print |> String.concat ", "
         $"{print callee}<{txtGenArgs}>({txtArgs})"
-    | Lambda(args, body, captures) ->
+    | Lambda(args, isMutable, body, captures) ->
         let txtArgs =
             args |> List.map (fun arg -> $"auto {arg}") |> String.concat ", "
 
         let txtBody = printBody body
         let txtCaptures = String.concat ", " captures
+        let mut = if isMutable then " mutable " else ""
 
         if txtArgs = "" then
-            $"[{txtCaptures}]{{{txtBody}}}"
+            $"[{txtCaptures}]{mut}{{{txtBody}}}"
         else
-            $"[{txtCaptures}]({txtArgs}){{{txtBody}}}"
+            $"[{txtCaptures}]({txtArgs}){mut}{{{txtBody}}}"
     | GetField(src, field) -> $"{print src}.{field}"
     | DerefGetField(src, field) ->
         let txtSrc = print src

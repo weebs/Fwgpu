@@ -204,9 +204,9 @@ let rec translate (e: FSharpExpr) : CppExpr =
                 translateS body |> addReturn
 
         if mfv.IsCompilerGenerated && mfv.DisplayName.StartsWith "unitVar" then
-            Lambda([], stmts, [])
+            Lambda([], true, stmts, [ "=" ])
         else
-            Lambda([ mfv.CompiledName ], stmts, [ "=" ])
+            Lambda([ mfv.CompiledName ], true, stmts, [ "=" ])
         |> fun lambda ->
             let argTy = mfv.FullType |> tyConvert |> printType
             let rt = body.Type |> tyConvert |> printType
@@ -355,7 +355,7 @@ and translateS (e: FSharpExpr) : CppStmt list =
                 let args = fst targets[i] |> List.map _.FullName
                 let body = snd targets[i] |> translateS |> addReturn
 
-                SVariable($"_{i}", Auto, Some(Lambda(args, body, [ "&" ])))
+                SVariable($"_{i}", Auto, Some(Lambda(args, true, body, [ "&" ])))
         ]
 
         cppTargets @ desc
@@ -368,8 +368,8 @@ and translateS (e: FSharpExpr) : CppStmt list =
                 TryCatch(tryBody, "...", [])
                 yield! finallyBody
             else
-                let tryLambda = Lambda([], tryBody |> addReturn, [ "&" ])
-                let finallyLambda = Lambda([], finallyBody, [ "&" ])
+                let tryLambda = Lambda([], true, tryBody |> addReturn, [ "&" ])
+                let finallyLambda = Lambda([], true, finallyBody, [ "&" ])
                 SVariable("tryBody", Auto, Some tryLambda)
                 SVariable("finally", Auto, Some finallyLambda)
                 SVariable("result", tyConvert tryExpr.Type, None)

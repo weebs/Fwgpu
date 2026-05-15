@@ -355,7 +355,7 @@ type CppCompiler() =
         elif mfv.IsFunction && curriedArgs = [] then
             // Lambda values
             let value = Transform.translateVar mfv body
-            let lambda = Ast.Lambda([], [ Ast.Return value ], [])
+            let lambda = Ast.Lambda([], true, [ Ast.Return value ], [])
             Ast.Variable(mfv.CompiledName, Ast.Auto, Some (Ast.Call(lambda, [])))
         elif mfv.IsFunction then
             this.Function mfv curriedArgs body
