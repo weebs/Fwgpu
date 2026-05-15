@@ -115,7 +115,22 @@ template <typename T> bool IsType(Gc<System::Object> obj) {
     return obj->__data.type() == typeid(T);
   }
 }
+}
 
+template <typename A, typename B>
+class FSharpFunc : public System::Object {
+std::function<B(A)> fn;
+public:
+  FSharpFunc(std::function<B(A)> fn) : fn(fn) {}
+  FSharpFunc* operator->() { return this; }
+
+  B operator()(A a) { return fn(a); }
+  B invoke(A a) { return fn(a); }
+  operator std::function<B(A)>&() { return *fn; }
+};
+
+
+namespace System {
 template <typename T>
 class Box : public virtual Object {
 T data;
