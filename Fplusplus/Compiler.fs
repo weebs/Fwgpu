@@ -351,10 +351,6 @@ type CppCompiler() =
         // let args = argsFromFunction mfv
         let args = toArgs curriedArgs
 
-        let converted = Walk.convert body
-        printfn $"%A{converted}"
-        // printfn $"%A{Walk.prettyPrintDU converted}"
-
         let stmts =
             Transform.translateS body
             |> fun stmts ->
