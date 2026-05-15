@@ -9,11 +9,11 @@
 .vscode/
 
 # F# / .NET build output
-Fwgpu/bin/
-Fwgpu/obj/
+Fplusplus/bin/
+Fplusplus/obj/
 **/bin/*
 **/obj/*
-Fw/cpp
+Fplusplus/cpp
 
 # Node / Vite build output
 tsgpu/node_modules/
