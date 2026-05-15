@@ -387,14 +387,21 @@ and translateS (e: FSharpExpr) : CppStmt list =
                 Exp(Call(Var "finally", []))
                 Exp(Var "result")
         ]
-    | P.TryWith(a, mfvA, b, mfvB, c, dbgTry, dbgWith) -> [
-        SComment "Try"
-        yield! translateS a
-        SComment "With"
-        yield! translateS b
-        SComment "???? trywith"
-        yield! translateS c
-      ]
+    | P.TryWith(tryExpr,
+                filterVar,
+                filterExpr,
+                withVar,
+                withExpr,
+                dbgTry,
+                dbgWith) ->
+        // todo : Todo exception filters
+        [
+            TryCatch(
+                translateS tryExpr,
+                $"const System::Exception& {withVar.CompiledName}",
+                translateS withExpr
+            )
+        ]
     | _ -> [ Exp(translate e) ]
 
 let isByRef (t: FSharpType) =

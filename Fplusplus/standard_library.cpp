@@ -6,6 +6,7 @@
 #include <print>
 // #include <memory>
 #include <functional>
+#include <exception>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -19,41 +20,41 @@ static std::ios_base::Init __stream_initializer;
 
 #ifndef INITMACRO
 #define INITMACRO
-#define CONCAT_HIDDEN(a, b) a ## b
+#define CONCAT_HIDDEN(a, b) a##b
 #define CONCAT(a, b) CONCAT_HIDDEN(a, b)
 #define INIT auto CONCAT(__, __COUNTER__) = [] {
-#define ENDINIT return 0; }();
+#define ENDINIT                                                                \
+  return 0;                                                                    \
+  }                                                                            \
+  ();
 #endif
 
-template <typename T>
-class Ref {
+template <typename T> class Ref {
 public:
-  T* Value;
+  T *Value;
   Ref() : Value(nullptr) {}
-  Ref(const T& value) {
-    Value = (T*)GC_malloc(sizeof(T));
+  Ref(const T &value) {
+    Value = (T *)GC_malloc(sizeof(T));
     // *Value = value;
     new (Value) T(value);
   }
-  Ref(T* value) : Value(value) {}
+  Ref(T *value) : Value(value) {}
   // Ref(const Ref&) = delete;
-  Ref(const Ref& other) : Value(other.Value) {};
-  operator T&() { return *Value; }
-  operator const T&() const { return *Value; }
-  T* operator->() { return Value; }
-  const T* operator->() const { return Value; }
-  Ref& operator=(const Ref& other) {
+  Ref(const Ref &other) : Value(other.Value) {};
+  operator T &() { return *Value; }
+  operator const T &() const { return *Value; }
+  T *operator->() { return Value; }
+  const T *operator->() const { return Value; }
+  Ref &operator=(const Ref &other) {
     *Value = other.Value;
     return *this;
   }
 
-
-  Ref& operator=(const T& value) {
+  Ref &operator=(const T &value) {
     *Value = value;
     return *this;
   }
 };
-
 
 struct SetupBoehmGC {
 public:
@@ -65,8 +66,9 @@ SetupBoehmGC __setupBoehmGc;
 
 template <typename T> using Gc = T *;
 
-template <typename From, typename To, typename T>
-To coerce(T& value) { return dynamic_cast<To>(static_cast<From>(value)); }
+template <typename From, typename To, typename T> To coerce(T &value) {
+  return dynamic_cast<To>(static_cast<From>(value));
+}
 
 namespace System {
 class Object;
@@ -89,7 +91,7 @@ public:
   operator T() { return data; }
   T get() { return data; }
   GcRoot(const GcRoot &) = delete;
-//   GcRoot &operator=(const GcRoot &) = delete;
+  //   GcRoot &operator=(const GcRoot &) = delete;
 };
 
 template <typename T>
@@ -120,39 +122,38 @@ template <typename T> bool IsType(Gc<System::Object> obj) {
     return obj->__data.type() == typeid(T);
   }
 }
-}
+} // namespace System
 
-template <typename A, typename B>
-class FSharpFunc : public System::Object {
-std::function<B(A)> fn;
+template <typename A, typename B> class FSharpFunc : public System::Object {
+  std::function<B(A)> fn;
+
 public:
   FSharpFunc(std::function<B(A)> fn) : fn(fn) {}
-  FSharpFunc* operator->() { return this; }
+  FSharpFunc *operator->() { return this; }
 
   B operator()(A a) { return fn(a); }
   B invoke(A a) { return fn(a); }
-  operator std::function<B(A)>&() { return *fn; }
+  operator std::function<B(A)> &() { return fn; }
 };
-template <typename B>
-class FSharpFunc<void, B> : public System::Object {
-std::function<B()> fn;
+template <typename B> class FSharpFunc<void, B> : public System::Object {
+  std::function<B()> fn;
+
 public:
   FSharpFunc(std::function<B()> fn) : fn(fn) {}
-  FSharpFunc* operator->() { return this; }
+  FSharpFunc *operator->() { return this; }
 
-  // B operator()(A a) { return fn(a); }
+  B operator()() { return fn(); }
   B invoke() { return fn(); }
-  operator std::function<B()>&() { return fn; }
+  operator std::function<B()> &() { return fn; }
 };
 
-
 namespace System {
-template <typename T>
-class Box : public virtual Object {
-T data;
+template <typename T> class Box : public virtual Object {
+  T data;
+
 public:
   Box(T value) : data(value) {}
-  T* get() { return &data; }
+  T *get() { return &data; }
 };
 
 class String : public Object {
@@ -165,13 +166,22 @@ public:
     data = (char *)GC_malloc_atomic(length);
     memcpy(data, chars, length);
   }
-  String(const std::string& str) : String(str.c_str()) {
-  }
+  String(const std::string &str) : String(str.c_str()) {}
 
   operator std::string() { return std::string(data); }
 
   bool operator==(const String &other) const {
     return strcmp(data, other.data) == 0;
+  }
+};
+  
+class Exception : public Object, public std::exception {
+public:
+  System::String Message;
+  Exception(System::String msg) : Message(msg) {}
+  std::string ToString() override
+  {
+    return std::string("System.Exception: ") + (std::string)Message;
   }
 };
 
@@ -326,6 +336,10 @@ template <typename T> T UnboxGeneric(Gc<System::Object> obj) {
 } // namespace LanguagePrimitives
 namespace Operators {
 
+template <typename T> T FailWith(System::String error) { 
+  throw System::Exception(error);
+}
+
 template <typename T> T op_LeftShift(T x, int n) { return x << n; }
 
 template <typename T> T op_RightShift(T x, int n) { return x >> n; }
@@ -357,9 +371,7 @@ Collections::seq_1<T> *CreateSequence(Collections::seq_1<T> *xs) {
 
 // std::string ToString(int x) { return std::to_string(x); }
 
-System::String ptr_to_string(System::Object* x) {
-  return x->ToString();
-}
+System::String ptr_to_string(System::Object *x) { return x->ToString(); }
 template <typename T> System::String ToString(T x) {
   if constexpr (std::is_pointer_v<T>) {
     return ptr_to_string(x);
