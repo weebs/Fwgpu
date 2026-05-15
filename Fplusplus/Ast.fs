@@ -12,6 +12,8 @@ type CppTy =
     | Auto
     | Gen of template: string * args: CppTy list
     | Ptr of CppTy
+    | TyRef of CppTy
+    | TyConst of CppTy
 
 type ArgSig = (string * CppTy) list
 
@@ -46,8 +48,9 @@ type CppDecl =
 type CppExpr =
     | Var of string
     | Const of obj * FSharpType
+    | Ref of CppExpr
     | Call of callee: CppExpr * args: CppExpr list
-    | ExprBlock of body: CppStmt list
+    | BlockExpr of body: CppStmt list
     | CallGen of callee: CppExpr * genArgs: CppExpr list * args: CppExpr list
     | Lambda of args: string list * isMutable: bool * body: CppStmt list * captures: string list
     | ExprComment of string
@@ -136,7 +139,7 @@ let rec print (e: CppExpr) =
             |> String.concat ", "
 
         $"{printType ty} {{ {txtFields} }}"
-    | ExprBlock body ->
+    | BlockExpr body ->
         $"({{{printBody body}}})"
 
 
@@ -165,6 +168,8 @@ and printBody (body: CppStmt list) =
 and printType (ty: CppTy) =
     match ty with
     | Ptr t -> printType t + "*"
+    | CppTy.TyConst t -> $"const {printType t}"
+    | CppTy.TyRef t -> $"&{printType t}"
     | Auto -> "auto"
     | Void -> "void"
     | Named s -> s
@@ -300,8 +305,8 @@ let rec shadowVariables
                 [ Scope(l :: shadowVariables (name :: vars) rest) ]
             else
                 l :: shadowVariables (name :: vars) rest
-        | Exp (ExprBlock body) ->
-            Exp (ExprBlock (shadowVariables [] body)) :: shadowVariables vars rest
+        | Exp (BlockExpr body) ->
+            Exp (BlockExpr (shadowVariables [] body)) :: shadowVariables vars rest
         | Assign _
         | Return _
         | SComment _

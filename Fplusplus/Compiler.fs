@@ -9,9 +9,7 @@ open FSharp.Compiler.Text
 open System.Collections.Generic
 
 module P = FSharpExprPatterns
-
 type FsImplFileDecl = FSharpImplementationFileDeclaration
-
 
 module Deps =
     open FSharp.Data.LiteralProviders
@@ -57,18 +55,9 @@ let parseAndTypeCheckSingleFile (checker: FSharpChecker) file input =
         | res -> return failwithf "Parsing did not finish... (%A)" res
     }
 
-type Logger() =
-    let log = ResizeArray()
-    member this.Info (info: string) = fun data -> log.Add data
-    member this.Info (data: obj list) = log.Add data
-
-    member this.Info<'t> (data: 't list) = data |> List.map box |> this.Info
-
 type FsMfv = FSharpMemberOrFunctionOrValue
 
 type CppCompiler() =
-    let log = Logger()
-
     let types = Dictionary()
 
 
@@ -181,9 +170,9 @@ type CppCompiler() =
                 for mfv in entity.MembersFunctionsAndValues do
                     let args = toMethodArgs mfv.CurriedParameterGroups
                     let rt = Transform.tyConvert mfv.ReturnParameter.Type
-                    let virtName = mfv.FullName.Replace(".", "_")
+                    let virtualName = mfv.FullName.Replace(".", "_")
                     let argNames = args |> List.map fst
-                    Ast.DeletedVirtual(virtName, { rt = rt; args = args })
+                    Ast.DeletedVirtual(virtualName, { rt = rt; args = args })
 
                     Ast.Function(
                         mfv.CompiledName,
@@ -191,7 +180,7 @@ type CppCompiler() =
                         Some [
                             Ast.Exp(
                                 Ast.Call(
-                                    Ast.Var virtName,
+                                    Ast.Var virtualName,
                                     argNames |> List.map Ast.Var
                                 )
                             )
@@ -269,7 +258,6 @@ type CppCompiler() =
         ]
 
         // todo : AllInterfaces vs DeclaredInterfaces?
-        // let all = entity.AllInterfaces
         let interfaces =
             entity.DeclaredInterfaces
             |> Seq.toList
@@ -282,49 +270,20 @@ type CppCompiler() =
         }
 
     member private this.MethodSig mfv =
-        let fname =
+        let fnName =
             if not mfv.IsExplicitInterfaceImplementation then
                 mfv.CompiledName
             else
                 mfv.CompiledName.Replace(".", "_")
 
-        // todo : use toArgs ?
-        let args =
-            mfv.CurriedParameterGroups
-            |> Seq.map Seq.toList
-            |> Seq.collect id
-            |> Seq.toList
-            |> List.filter (not << Transform.isUnit << _.Type)
-            |> List.map (fun p -> (p.FullName, Transform.tyConvert p.Type))
-        // let args = toArgs mfv.CurriedParameterGroups
         let args = toMethodArgs mfv.CurriedParameterGroups
-
         let rt = Transform.tyConvert mfv.ReturnParameter.Type
-        Ast.Function($"{fname}", { rt = rt; args = args }, None)
+        Ast.Function($"{fnName}", { rt = rt; args = args }, None)
 
     member private this.ProcessInitAction action =
         let body = Transform.translateS action
-        let r = action.Range
-
-        let tag =
-            match r.StartColumn with
-            | 0 -> $"__{r.StartLine}"
-            | c -> $"__{r.StartLine}_{c}"
-
-        // We represent init actions with static IIFE lambdas
+        // Init actions are represented with static IIFE lambdas
         Ast.INIT body
-    // Ast.Sequence [
-    //     Ast.Variable(
-    //         tag,
-    //         Ast.Auto,
-    //         Some(
-    //             Ast.Call(
-    //                 Ast.Lambda([], body @ [ Ast.Return(Ast.Var "0") ], []),
-    //                 []
-    //             )
-    //         )
-    //     )
-    // ]
 
     member private this.ProcessMfv mfv curriedArgs body =
         let stmts =
@@ -335,7 +294,6 @@ type CppCompiler() =
             else
                 Transform.translateS body |> Ast.addReturn
 
-        log.Info stmts
         let rt = Transform.tyConvert body.Type
 
         let funcName =
@@ -356,7 +314,7 @@ type CppCompiler() =
             // Lambda values
             let value = Transform.translateVar mfv body
             let lambda = Ast.Lambda([], true, [ Ast.Return value ], [])
-            Ast.Variable(mfv.CompiledName, Ast.Auto, Some (Ast.Call(lambda, [])))
+            Ast.Variable(mfv.CompiledName, Ast.Auto, Some(Ast.Call(lambda, [])))
         elif mfv.IsFunction then
             this.Function mfv curriedArgs body
         else

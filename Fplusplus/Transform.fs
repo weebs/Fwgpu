@@ -28,7 +28,7 @@ let isUnit (t: FSharpType) =
     with ex ->
         printfn $"{ex}"
         false
-        
+
 let fieldName (field: FSharpField) = field.Name
 
 let toCppPath (s: string) =
@@ -61,8 +61,6 @@ let typeName (t: FSharpType) =
         if t.BasicQualifiedName = "Microsoft.FSharp.Core.obj" then
             "System::Object"
         else
-            // todo
-            // t.TypeDefinition.BasicQualifiedName |> toCppPath
             t.BasicQualifiedName |> toCppPath
 
     if t.GenericArguments.Count = 0 then
@@ -109,7 +107,13 @@ let translateVar (mfv: FSharpMemberOrFunctionOrValue) body =
 
 let rec translate (e: FSharpExpr) : CppExpr =
     match e with
-    | P.AddressOf expr -> Var $"&{translate expr |> print}"
+    | P.AddressOf expr -> Ref(translate expr)
+    | P.ThisValue _ty -> Var "this"
+    | P.Call(None, mfv, [], [], []) -> Var(qualifiedPath mfv)
+    | P.Value mfv when mfv.CompiledName = "bind@" -> Var "bind"
+    | P.Value mfv when mfv.IsMutable && requiresGc mfv.FullType ->
+        GetField(Var mfv.CompiledName, "Value")
+    | P.Value mfv -> Var(mfv.CompiledName |> replaceIncludedBCLNamespaces)
     | P.TypeTest(ty, expr) ->
         let tyTarget = tyConvert ty
 
@@ -164,7 +168,6 @@ let rec translate (e: FSharpExpr) : CppExpr =
         else
             Const(o, t)
     | P.Application(callee, [], args) ->
-        // Call(translate callee, List.map translateCallArg args)
         Call(
             DerefGetField(translate callee, "invoke"),
             List.map translateCallArg args
@@ -172,28 +175,25 @@ let rec translate (e: FSharpExpr) : CppExpr =
     | P.Application(callee, typeArgs, args) ->
         let genericArgs = typeArgs |> List.map (tyConvert >> printType >> Var)
         CallGen(translate callee, genericArgs, List.map translateCallArg args)
-    | P.Call(None, mfv, [], [], []) -> Var(qualifiedPath mfv)
-    | P.Call(None, mfv, xs, [], args) ->
+    | P.Call(None, mfv, classTypeArgs, [], args) ->
         let path = qualifiedPath mfv
         Call(Var path, List.map translateCallArg args)
-    | P.Call(None, mfv, xs, ys, args) ->
+    | P.Call(None, mfv, classTypeArgs, ys, args) ->
         let path = qualifiedPath mfv
         let genArgs = ys |> List.map (tyConvert >> printType >> Var)
         CallGen(Var path, genArgs, List.map translateCallArg args)
     | P.Call(Some o, mfv, xs, ys, args) ->
-        let isRefVar = function
+        let isRefVar =
+            function
             | P.Value mfv -> mfv.IsMutable
-            | P.Call (None, mfv, [], [], []) -> mfv.IsMutable
+            | P.Call(None, mfv, [], [], []) -> mfv.IsMutable
             | _ -> false
+
         let case =
             if requiresGc o.Type || isRefVar o || isByRef o.Type then
                 DerefGetField
             else
                 GetField
-            // if o.Type.TypeDefinition.IsValueType && (not (isRefVar o) || not (requiresGc o.Type)) then
-            //     GetField
-            // else
-            //     DerefGetField
 
         Call(case (translate o, mfv.CompiledName), args |> List.map translate)
     | P.Lambda(mfv, body) ->
@@ -211,12 +211,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
             let argTy = mfv.FullType |> tyConvert |> printType
             let rt = body.Type |> tyConvert |> printType
             New($"FSharpFunc<{argTy}, {rt}>", [ lambda ])
-    | P.Value mfv when mfv.CompiledName = "bind@" -> Var "bind"
-    | P.Value mfv when mfv.IsMutable && requiresGc mfv.FullType -> GetField(Var mfv.CompiledName, "Value")
-    | P.Value mfv -> Var(mfv.CompiledName |> replaceIncludedBCLNamespaces)
-    | P.ThisValue _ty -> Var "this"
-    | P.FSharpFieldGet(Some expr, ty, field) ->
-        // TODO : check if e.Type.TypeDefinition is a reference type
+    | P.FSharpFieldGet(Some expr, _ty, field) ->
         match expr with
         | expr when expr.Type.TypeDefinition.IsValueType = false ->
             DerefGetField(translate expr, fieldName field)
@@ -246,10 +241,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
             Call(Var ctor, List.map translateCallArg args)
         else
             New(ctor, List.map translateCallArg args)
-    // Call(Var $"gcnew {ctor}", List.map translateCallArg args)
-    | P.Let((mfv, value, _dbg), body) ->
-        ExprBlock (translateS e)
-    | P.Sequential _ -> ExprBlock(translateS e)
+    | P.Sequential _ -> BlockExpr(translateS e)
     | P.ILAsm(asm, _types, _values) ->
         match replacements.TryGetValue asm with
         | true, replacement -> Var(replaceIncludedBCLNamespaces replacement)
@@ -259,6 +251,13 @@ let rec translate (e: FSharpExpr) : CppExpr =
         // todo : hack
         let t = tyConvert ty |> printType |> _.Replace("*", "")
         New(t, List.map translate values)
+    | P.Let _
+    | P.FastIntegerForLoop _
+    | P.IfThenElse _
+    | P.TryFinally _
+    | P.TryWith _
+    | P.LetRec _
+    | P.WhileLoop _ -> BlockExpr(translateS e)
     | _ -> ExprComment $"%A{e}"
 
 and translateS (e: FSharpExpr) : CppStmt list =
@@ -280,6 +279,7 @@ and translateS (e: FSharpExpr) : CppStmt list =
                 "bind"
             else
                 mfv.CompiledName
+
         let var =
             if mfv.IsMutable then
                 SVariable(
@@ -299,12 +299,12 @@ and translateS (e: FSharpExpr) : CppStmt list =
         Assign(Var mfv.CompiledName, translate value)
       ]
     | P.Sequential(a, b) -> translateS a @ translateS b
-    | P.FSharpFieldSet(Some dest, ty, field, value) -> [
-        // todo : check if e.Type.TypeDefinition is a reference type?
+    | P.FSharpFieldSet(Some dest, _ty, field, value) -> [
         let case =
             match dest with
             | P.ThisValue _ -> DerefGetField
-            | P.Value mfv when mfv.IsMemberThisValue || mfv.IsMutable -> DerefGetField
+            | P.Value mfv when mfv.IsMemberThisValue || mfv.IsMutable ->
+                DerefGetField
             | _ -> GetField
 
         Assign(case (translate dest, fieldName field), translate value)
@@ -355,7 +355,11 @@ and translateS (e: FSharpExpr) : CppStmt list =
                 let args = fst targets[i] |> List.map _.FullName
                 let body = snd targets[i] |> translateS |> addReturn
 
-                SVariable($"_{i}", Auto, Some(Lambda(args, true, body, [ "&" ])))
+                SVariable(
+                    $"_{i}",
+                    Auto,
+                    Some(Lambda(args, true, body, [ "&" ]))
+                )
         ]
 
         cppTargets @ desc
@@ -403,6 +407,7 @@ let isByRef (t: FSharpType) =
         | _ -> false
     with ex ->
         false
+
 let requiresGc (t: FSharpType) =
     try
         if t.IsFunctionType then
@@ -424,8 +429,10 @@ let requiresGc (t: FSharpType) =
                 | "PrintfFormat`5" -> false
                 | "string" -> true
                 | _ ->
-                    failwith
-                        $"Not sure of Microsoft.FSharp.Core type {t.TypeDefinition.CompiledName} in requiresGc"
+                    printfn
+                        $"Warning: Not sure of Microsoft.FSharp.Core type {t.TypeDefinition.CompiledName} in requiresGc"
+
+                    t.TypeDefinition.IsValueType
             | _ -> true
     with ex ->
         printfn $"{ex}"
@@ -451,6 +458,7 @@ let tyConvert (t: FSharpType) =
                 Named $"{tyConvert t.GenericArguments[0] |> printType}*"
             | "obj" -> Named "System::Object*"
             | "string" -> Named "System::String"
+            | "exn" -> Named "System::Exception"
             | _ -> Named $"auto /* {t.TypeDefinition.CompiledName} */"
         | _ ->
             // if t.IsFunctionType then funTyConvert t
