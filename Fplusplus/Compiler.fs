@@ -64,13 +64,13 @@ type CppCompiler() =
     let checker = FSharpChecker.Create(keepAssemblyContents = true)
 
     let argFromField (field: FSharpField) =
-        field.Name, Transform.tyConvert field.FieldType
+        field.Name, Type.convert field.FieldType
 
     let argFromParam (p: FSharpParameter) =
-        p.FullName, Transform.tyConvert p.Type
+        p.FullName, Type.convert p.Type
 
     let argFromMfv (mfv: FsMfv) =
-        mfv.CompiledName, Transform.tyConvert mfv.FullType
+        mfv.CompiledName, Type.convert mfv.FullType
 
     // TODO : Properly figure out the this argument
     let isThisArgument (mfv: FSharpMemberOrFunctionOrValue) =
@@ -80,16 +80,16 @@ type CppCompiler() =
         args
         |> List.collect id
         |> List.filter (not << isThisArgument)
-        |> List.filter (not << Transform.isUnit << _.FullType)
-        |> List.map (fun mfv -> mfv.FullName, Transform.tyConvert mfv.FullType)
+        |> List.filter (not << Type.isUnit << _.FullType)
+        |> List.map (fun mfv -> mfv.FullName, Type.convert mfv.FullType)
 
     let toMethodArgs (args: FSharpParameter IList IList) =
         args
         |> Seq.map Seq.toList
         |> Seq.collect id
         |> Seq.toList
-        |> List.filter (not << Transform.isUnit << _.Type)
-        |> List.map (fun p -> (p.FullName, Transform.tyConvert p.Type))
+        |> List.filter (not << Type.isUnit << _.Type)
+        |> List.map (fun p -> (p.FullName, Type.convert p.Type))
 
     let argsFromFunction (mfv: FsMfv) =
         // todo : Properly uncurry
@@ -169,7 +169,7 @@ type CppCompiler() =
             decls = [
                 for mfv in entity.MembersFunctionsAndValues do
                     let args = toMethodArgs mfv.CurriedParameterGroups
-                    let rt = Transform.tyConvert mfv.ReturnParameter.Type
+                    let rt = Type.convert mfv.ReturnParameter.Type
                     let virtualName = mfv.FullName.Replace(".", "_")
                     let argNames = args |> List.map fst
                     Ast.DeletedVirtual(virtualName, { rt = rt; args = args })
@@ -225,14 +225,14 @@ type CppCompiler() =
             | Some bt when bt.BasicQualifiedName = "Microsoft.FSharp.Core.obj" -> [
                 "virtual System::Object"
               ]
-            | Some bt -> [ Transform.typeName bt ]
+            | Some bt -> [ Type.name bt ]
             | _ -> []
 
         let recordCtor (entity: FSharpEntity) =
             let args =
                 entity.FSharpFields
                 |> Seq.toList
-                |> List.map (fun f -> (f.Name, Transform.tyConvert f.FieldType))
+                |> List.map (fun f -> (f.Name, Type.convert f.FieldType))
 
             Ast.Constructor(
                 entity.CompiledName,
@@ -261,7 +261,7 @@ type CppCompiler() =
         let interfaces =
             entity.DeclaredInterfaces
             |> Seq.toList
-            |> List.map Transform.typeName
+            |> List.map Type.name
 
         Ast.Class {
             name = entity.CompiledName
@@ -277,7 +277,7 @@ type CppCompiler() =
                 mfv.CompiledName.Replace(".", "_")
 
         let args = toMethodArgs mfv.CurriedParameterGroups
-        let rt = Transform.tyConvert mfv.ReturnParameter.Type
+        let rt = Type.convert mfv.ReturnParameter.Type
         Ast.Function($"{fnName}", { rt = rt; args = args }, None)
 
     member private this.ProcessInitAction action =
@@ -287,14 +287,14 @@ type CppCompiler() =
 
     member private this.ProcessMfv mfv curriedArgs body =
         let stmts =
-            if Transform.isUnit body.Type then
+            if Type.isUnit body.Type then
                 Transform.translateS body
-            elif not body.Type.IsFunctionType && Transform.isUnit body.Type then
+            elif not body.Type.IsFunctionType && Type.isUnit body.Type then
                 Transform.translateS body
             else
                 Transform.translateS body |> Ast.addReturn
 
-        let rt = Transform.tyConvert body.Type
+        let rt = Type.convert body.Type
 
         let funcName =
             if mfv.IsMember && mfv.IsFunction then
@@ -347,14 +347,14 @@ type CppCompiler() =
         Ast.Constructor(name, args, Some fixStmts)
 
     member private this.Function mfv curriedArgs body =
-        let rt = Transform.tyConvert body.Type
+        let rt = Type.convert body.Type
         // let args = argsFromFunction mfv
         let args = toArgs curriedArgs
 
         let stmts =
             Transform.translateS body
             |> fun stmts ->
-                if Transform.isUnit body.Type then
+                if Type.isUnit body.Type then
                     stmts
                 else
                     Ast.addReturn stmts
