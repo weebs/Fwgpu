@@ -29,7 +29,7 @@ let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
     replaceIncludedBCLNamespaces path
 
 
-let entTypeName (ent: FSharpEntity) = ent.BasicQualifiedName |> toCppPath
+let entTypeName (ent: FSharpEntity) = ent.BasicQualifiedName |> cppPath
 
 let rec requiresTempRef (e: FSharpExpr) =
     match e with

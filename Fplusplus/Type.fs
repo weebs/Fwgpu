@@ -33,7 +33,7 @@ let replaceIncludedBCLNamespaces (path: string) =
         .Replace("Microsoft::FSharp::Core::LanguagePrimitives", "")
         .Replace("Microsoft::FSharp::Collections", "")
 
-let toCppPath (s: string) =
+let cppPath (s: string) =
     s.Replace("+", "::").Replace(".", "::").Replace("`", "_")
     |> replaceIncludedBCLNamespaces
 
@@ -63,7 +63,7 @@ let name (t: FSharpType) =
         if t.BasicQualifiedName = "Microsoft.FSharp.Core.obj" then
             "System::Object"
         else
-            t.BasicQualifiedName |> toCppPath
+            t.BasicQualifiedName |> cppPath
 
     if t.GenericArguments.Count = 0 then
         baseTy
