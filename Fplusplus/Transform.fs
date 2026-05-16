@@ -1,5 +1,6 @@
 module rec Fw.Transform
 
+open System
 open Ast
 open FSharp.Compiler.Symbols
 
@@ -60,6 +61,27 @@ let qualifiedPath (mfv: FSharpMemberOrFunctionOrValue) =
 
     replaceIncludedBCLNamespaces path
 
+let genTypeName (t: FSharpType) =
+    let mutable types = t.GenericArguments |> Seq.toList
+    let s = t.BasicQualifiedName
+    let parts = s.Replace("+", ".").Split(".") |> Array.map ref
+
+    for part in parts do
+        if part.Value.Contains "`" then
+            let ab = part.Value.Split("`")
+            let name = ab[0]
+            let arity = ab[1] |> Int32.Parse
+
+            let txt =
+                List.take arity types |> List.map (tyConvert >> printType) |> String.concat ", "
+
+            types <- List.skip arity types
+            let app = $"{name}_{arity}<{txt}>"
+            part.Value <- app
+
+    let result = parts |> Array.map _.Value |> String.concat "::"
+    result
+
 let typeName (t: FSharpType) =
     let baseTy =
         if t.BasicQualifiedName = "Microsoft.FSharp.Core.obj" then
@@ -70,6 +92,8 @@ let typeName (t: FSharpType) =
     if t.GenericArguments.Count = 0 then
         baseTy
     else
+        let g = genTypeName t
+
         let args =
             t.GenericArguments
             |> Seq.map tyConvert
@@ -77,7 +101,36 @@ let typeName (t: FSharpType) =
             |> String.concat ", "
 
         $"{baseTy}<{args}>"
+        g
     |> replaceIncludedBCLNamespaces
+
+let tyConvert (t: FSharpType) =
+    if t.IsGenericParameter then
+        Named t.GenericParameter.Name
+    elif isUnit t then
+        Void
+    elif t.IsFunctionType then
+        let a = t.GenericArguments[0]
+        let b = t.GenericArguments[1]
+        Ptr(Gen("::FSharpFunc", [ tyConvert a; tyConvert b ]))
+    else
+        match t.TypeDefinition.AccessPath with
+        | "Microsoft.FSharp.Core" ->
+            match t.TypeDefinition.CompiledName with
+            | "int" -> Int
+            | "int32" -> Int
+            | "bool" -> Bool
+            | "byref`1" ->
+                Named $"{tyConvert t.GenericArguments[0] |> printType}*"
+            | "obj" -> Named "System::Object*"
+            | "string" -> Named "System::String"
+            | "exn" -> Named "System::Exception"
+            | _ -> Named $"auto /* {t.TypeDefinition.CompiledName} */"
+        | _ ->
+            // if t.IsFunctionType then funTyConvert t
+            if isUnit t then Void
+            else if requiresGc t then Named(typeName t + "*")
+            else Named(typeName t)
 
 let entTypeName (ent: FSharpEntity) = ent.BasicQualifiedName |> toCppPath
 
@@ -113,6 +166,7 @@ let rec translate (e: FSharpExpr) : CppExpr =
     match e with
     | P.AddressOf expr -> Ref(translate expr)
     | P.ThisValue _ty -> Var "this"
+    | P.Value mfv when mfv.IsMemberThisValue -> Var "this"
     | P.Call(None, mfv, [], [], []) -> Var(qualifiedPath mfv)
     // todo : hack
     | P.Value mfv when mfv.CompiledName = "bind@" -> Var "bind"
@@ -457,31 +511,3 @@ let requiresGc (t: FSharpType) =
     with ex ->
         printfn $"{ex}"
         reraise ()
-
-let tyConvert (t: FSharpType) =
-    if t.IsGenericParameter then
-        Named t.GenericParameter.Name
-    elif isUnit t then
-        Void
-    elif t.IsFunctionType then
-        let a = t.GenericArguments[0]
-        let b = t.GenericArguments[1]
-        Ptr(Gen("::FSharpFunc", [ tyConvert a; tyConvert b ]))
-    else
-        match t.TypeDefinition.AccessPath with
-        | "Microsoft.FSharp.Core" ->
-            match t.TypeDefinition.CompiledName with
-            | "int" -> Int
-            | "int32" -> Int
-            | "bool" -> Bool
-            | "byref`1" ->
-                Named $"{tyConvert t.GenericArguments[0] |> printType}*"
-            | "obj" -> Named "System::Object*"
-            | "string" -> Named "System::String"
-            | "exn" -> Named "System::Exception"
-            | _ -> Named $"auto /* {t.TypeDefinition.CompiledName} */"
-        | _ ->
-            // if t.IsFunctionType then funTyConvert t
-            if isUnit t then Void
-            else if requiresGc t then Named(typeName t + "*")
-            else Named(typeName t)

@@ -5,8 +5,8 @@
 #include <iostream>
 #include <print>
 // #include <memory>
-#include <functional>
 #include <exception>
+#include <functional>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -28,12 +28,19 @@ static std::ios_base::Init __stream_initializer;
   }                                                                            \
   ();
 #endif
+template <typename T> struct remove_one_pointer {
+  using type = T;
+};
 
+template <typename T> struct remove_one_pointer<T *> {
+  using type = T;
+};
 template <typename U> class Ref {
-  using T = std::remove_pointer_t<U>;
+  using T = remove_one_pointer<U>::type;
+
 public:
   T *Value;
-  Ref() : Value((T*)GC_malloc(sizeof(T))) {}
+  Ref() : Value((T *)GC_malloc(sizeof(T))) {}
   Ref(const T &value) {
     Value = (T *)GC_malloc(sizeof(T));
     new (Value) T(value);
@@ -52,8 +59,8 @@ public:
     *Value = value;
     return *this;
   }
-  
-  Ref &operator=(T* value) {
+
+  Ref &operator=(T *value) {
     *Value = *value;
     return *this;
   }
@@ -129,6 +136,7 @@ template <typename T> bool IsType(Gc<System::Object> obj) {
 
 template <typename A, typename B> class FSharpFunc : public System::Object {
   std::function<B(A)> fn;
+
 public:
   FSharpFunc(std::function<B(A)> fn) : fn(fn) {}
   FSharpFunc *operator->() { return this; }
@@ -180,13 +188,12 @@ public:
     return strcmp(data, other.data) == 0;
   }
 };
-  
+
 class Exception : public Object, public std::exception {
 public:
   System::String Message;
   Exception(System::String msg) : Message(msg) {}
-  std::string ToString() override
-  {
+  std::string ToString() override {
     return std::string("System.Exception: ") + (std::string)Message;
   }
 };
@@ -342,11 +349,13 @@ template <typename T> T UnboxGeneric(Gc<System::Object> obj) {
 } // namespace LanguagePrimitives
 namespace Operators {
 
-template <typename T> T FailWith(System::String error) { 
+template <typename T> T FailWith(System::String error) {
   throw System::Exception(error);
 }
 
-template <typename A, typename B> bool op_LessThanOrEqual(A a, B b) { return a <= b; }
+template <typename A, typename B> bool op_LessThanOrEqual(A a, B b) {
+  return a <= b;
+}
 template <typename T> T op_LeftShift(T x, int n) { return x << n; }
 
 template <typename T> T op_RightShift(T x, int n) { return x >> n; }
@@ -354,7 +363,7 @@ template <typename T> T op_RightShift(T x, int n) { return x >> n; }
 template <typename A, typename B, typename C> C op_Addition(A x, B y) {
   return x + y;
 }
-  
+
 template <typename A, typename B, typename C> C op_Subtraction(A x, B y) {
   return x - y;
 }
@@ -365,8 +374,12 @@ template <typename A, typename B, typename C> C op_Multiply(A x, B y) {
 
 template <typename T> Collections::seq_1<T> *op_Range(T start, T end);
 
-template <typename A, typename B> bool op_Inequality(A a, B b) {
+template <typename A, typename B> bool op_Equality(A a, B b) {
   return a == b;
+}
+  
+template <typename A, typename B> bool op_Inequality(A a, B b) {
+  return a != b;
 }
 
 template <typename A, typename B> bool op_LessThan(A x, B y) { return x < y; }
